@@ -92,7 +92,8 @@ console.log("STORE_NAME:", session.storeName);
 
     // Fetch merchant and authorized app details
     const [merchantResponse, authorizedAppResponse] = await Promise.all([ikas.queries.getMerchant(), ikas.queries.getAuthorizedApp()]);
-
+console.log("merchantResponse", merchantResponse);
+console.log("authorizedAppResponse", authorizedAppResponse);
     // Validate responses
     if (
       !merchantResponse.isSuccess ||
