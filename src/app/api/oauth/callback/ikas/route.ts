@@ -67,7 +67,7 @@ console.log("STORE_NAME:", session.storeName);
         redirect_uri: getRedirectUri(request.headers.get('host')!),
       },
       {
-        storeName: (session.storeName || 'api') as string,
+       storeName: (searchParams.get('storeName') || session.storeName || 'api') as string,
       },
     );
 
