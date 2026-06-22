@@ -48,6 +48,10 @@ export async function GET(request: NextRequest) {
     // Generate the base OAuth URL for the given store
     const oauthBaseUrl = OAuthAPI.getOAuthUrl({ storeName });
 
+console.log("STORE =", storeName);
+console.log("CLIENT_ID =", config.oauth.clientId);
+console.log("OAUTH_BASE_URL =", oauthBaseUrl);
+
     // Construct the full Ikas OAuth authorize URL with required query parameters
     const authorizeUrl =
       `${oauthBaseUrl}/authorize` +
@@ -55,7 +59,7 @@ export async function GET(request: NextRequest) {
       `&redirect_uri=${encodeURIComponent(getRedirectUri(request.headers.get('host')!))}` +
       `&scope=${encodeURIComponent(config.oauth.scope)}` +
       `&state=${encodeURIComponent(state)}`;
-
+console.log("AUTHORIZE_URL =", authorizeUrl);
     // Redirect the user to the Ikas OAuth authorization page
     return NextResponse.redirect(authorizeUrl);
   } catch (error) {
