@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { GetMerchantQueryData } from '@/lib/ikas-client/generated/graphql';
 import { getIkas } from '@/helpers/api-helpers';
 import { getUserFromRequest } from '@/lib/auth-helpers';
