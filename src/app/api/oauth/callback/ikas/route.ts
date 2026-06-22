@@ -53,6 +53,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid state parameter' }, { status: 400 });
     }
 
+console.log("CLIENT_ID:", config.oauth.clientId);
+console.log("REDIRECT_URI:", getRedirectUri(request.headers.get('host')!));
+console.log("STORE_NAME:", session.storeName);
+
+
     // Exchange authorization code for access/refresh tokens
     const tokenResponse = await OAuthAPI.getTokenWithAuthorizationCode(
       {
