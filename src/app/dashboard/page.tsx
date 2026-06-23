@@ -20,7 +20,7 @@ type ReturnRequest = {
 export default function DashboardPage() {
   const [requests, setRequests] = useState<ReturnRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('Tümü');
   const [search, setSearch] = useState('');
   const [adminNote, setAdminNote] = useState('');
