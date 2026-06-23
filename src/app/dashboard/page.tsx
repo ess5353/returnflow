@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useSearchParams } from 'next/navigation';
+
 
 
 type ReturnRequest = {
@@ -28,17 +28,7 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState('Tümü');
   const [search, setSearch] = useState('');
   const [adminNote, setAdminNote] = useState('');
-const searchParams = useSearchParams();
 
-  useEffect(() => {
-
-    console.log('storeName:', searchParams.get('storeName'));
-
-    console.log('merchantId:', searchParams.get('merchantId'));
-
-    console.log('authorizedAppId:', searchParams.get('authorizedAppId'));
-
-  }, [searchParams]);
 
 
   const fetchRequests = async () => {
