@@ -127,7 +127,7 @@ console.log("authorizedAppResponse", authorizedAppResponse);
     } as AuthToken;
 
     // Store the token for future use
-    await AuthTokenManager.put(token);
+   // await AuthTokenManager.put(token);
 
     // Update session with new merchant and app IDs, clear state, and set expiration
     session.expiresAt = new Date(Date.now() + 3600 * 1000);
