@@ -1,17 +1,29 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: ['*.trycloudflare.com'],
-  // Webpack configuration
+
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'ALLOWALL',
+          },
+        ],
+      },
+    ];
+  },
+
   webpack: (config) => {
-    // Disable fs module on client side (required for Vercel)
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
     };
 
-  
     return config;
   },
 };
 
-module.exports = nextConfig; 
+module.exports = nextConfig;
