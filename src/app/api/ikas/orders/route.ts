@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     const ikas = getIkas(authToken);
 
     const response = await ikas.queries.listOrder();
+console.log('LIST ORDER RESPONSE:', JSON.stringify(response, null, 2));
 
     return NextResponse.json(response.data);
   } catch (error) {
