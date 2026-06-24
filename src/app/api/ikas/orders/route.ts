@@ -31,12 +31,15 @@ export async function GET(request: NextRequest) {
 console.log('LIST ORDER RESPONSE:', JSON.stringify(response, null, 2));
 
     return NextResponse.json(response.data);
-  } catch (error) {
-    console.error(error);
+  } catch (error: any) {
+  console.error('ORDERS ERROR:', error);
 
-    return NextResponse.json(
-      { error: 'Failed' },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      error: 'Failed',
+      details: String(error),
+    },
+    { status: 500 }
+  );
+}
 }
