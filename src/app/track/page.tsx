@@ -7,6 +7,7 @@ export default function TrackPage() {
   const [trackingId, setTrackingId] = useState('');
   const [request, setRequest] = useState<any>(null);
 const [email, setEmail] = useState('');
+const [notFound, setNotFound] = useState(false);
 
 
   const searchRequest = async () => {
@@ -21,8 +22,18 @@ const [email, setEmail] = useState('');
   console.log('ERROR:', error);
 
   if (data && data.length > 0) {
-    setRequest(data[0]);
-  }
+
+  setRequest(data[0]);
+
+  setNotFound(false);
+
+} else {
+
+  setRequest(null);
+
+  setNotFound(true);
+
+}
 };
 
   return (
@@ -54,7 +65,17 @@ const [email, setEmail] = useState('');
     Sorgula
   </button>
 </div>
+{notFound && (
+  <div className="mt-8 rounded-3xl border border-red-100 bg-red-50 p-6">
+    <p className="font-bold text-red-700">
+      İade talebi bulunamadı.
+    </p>
 
+    <p className="mt-2 text-red-600">
+      Sipariş numarası veya e-posta adresinizi kontrol edin.
+    </p>
+  </div>
+)}
         {request && (
           <div className="mt-8 rounded-3xl bg-white p-6 border">
             <h2 className="text-2xl font-bold">
