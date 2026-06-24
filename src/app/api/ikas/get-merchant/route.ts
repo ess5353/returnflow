@@ -35,6 +35,8 @@ export async function GET(request: NextRequest,) {
     // Initialize Ikas API client with the auth token
     const ikasClient = getIkas(authToken);
 
+    console.log('IKAS CLIENT:', Object.keys(ikasClient));
+console.log('IKAS QUERIES:', Object.keys(ikasClient.queries));
     // Fetch merchant information from Ikas API
     const merchantResponse = await ikasClient.queries.getMerchant();
 
