@@ -12,6 +12,7 @@ export default function ReturnsPage() {
   const [email, setEmail] = useState('');
   const [orderNo, setOrderNo] = useState('');
 const [order, setOrder] = useState<any>(null);
+const [createdRfNumber, setCreatedRfNumber] = useState('');
   
 const createReturnRequest = async () => {
   setIsSubmitting(true);
@@ -46,10 +47,33 @@ const fileName = `${Date.now()}-${Math.random()
     }
   }
 console.log('ORDER DATA:', order);
+const now = new Date();
+
+const datePart = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(
+  now.getDate()
+).padStart(2, '0')}`;
+
+const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+
+const { count, error: countError } = await supabase
+  .from('return_requests')
+  .select('*', { count: 'exact', head: true })
+  .gte('created_at', startOfDay);
+
+if (countError) {
+  console.error(countError);
+  setIsSubmitting(false);
+  alert('RF numarası oluşturulamadı');
+  return;
+}
+
+const sequence = String((count || 0) + 1).padStart(4, '0');
+const rfNumber = `RF-${datePart}-${sequence}`;
   const { error } = await supabase
     .from('return_requests')
     .insert([
       {
+        rf_number: rfNumber,
         order_id: order.order_no,
         customer_name: order.customer_name,
         customer_email: email,
@@ -68,6 +92,7 @@ console.log('ORDER DATA:', order);
     alert('Kayıt sırasında hata oluştu');
     return;
   }
+  setCreatedRfNumber(rfNumber);
 setIsSubmitting(false);
   setStep('success');
 };
@@ -299,7 +324,7 @@ if (
 
                   <div className="mt-8 rounded-3xl bg-gray-50 border border-gray-100 p-5 text-left">
                     <p className="text-gray-500 text-sm">Talep No</p>
-                    <h3 className="text-2xl font-bold">RF-1042</h3>
+                    <h3 className="text-2xl font-bold">{createdRfNumber}</h3>
 
                     <p className="text-gray-500 text-sm mt-5">Durum</p>
                     <h3 className="text-xl font-bold">İncelemede</h3>
