@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-
+import { TokenHelpers } from '@/helpers/token-helpers';
 
 
 type ReturnRequest = {
@@ -50,8 +50,24 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
+  fetchRequests();
+
+  (async () => {
+    const token = await TokenHelpers.getTokenForIframeApp();
+
+    console.log('IKAS TOKEN:', token);
+
+    const response = await fetch('/api/ikas/orders', {
+      headers: {
+        Authorization: `JWT ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    console.log('IKAS ORDERS:', data);
+  })();
+}, []);
 
   const updateStatus = async (status: string) => {
   if (!selectedRequest) return;
