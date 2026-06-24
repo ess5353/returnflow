@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 type ReturnRequest = {
   id: string;
   order_id: string;
+  rf_number: string;
   customer_name: string;
   product: string;
   reason: string;
@@ -290,8 +291,7 @@ const topReason =
                     >
                       <div>
                         <div className="flex flex-wrap gap-2 items-center">
-                          <strong>RF-{request.id.slice(0, 4).toUpperCase()}</strong>
-                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+<strong>{request.rf_number}</strong>                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${
 
     request.status === 'Onaylandı'
 
@@ -350,8 +350,7 @@ const topReason =
             ) : (
               <>
                 <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em]">
-                  RF-{selected.id.slice(0, 4).toUpperCase()}
-                </h2>
+  {selected.rf_number}                </h2>
 
                 <div className="mt-6 space-y-5">
                   <div>
