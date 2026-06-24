@@ -6,12 +6,15 @@ import { supabase } from '@/lib/supabase';
 export default function TrackPage() {
   const [trackingId, setTrackingId] = useState('');
   const [request, setRequest] = useState<any>(null);
+const [email, setEmail] = useState('');
+
 
   const searchRequest = async () => {
   const { data, error } = await supabase
     .from('return_requests')
     .select('*')
-    .eq('order_id', trackingId);
+    .eq('order_id', trackingId)
+      .eq('customer_email', email);
 
   console.log('TRACKING ID:', trackingId);
   console.log('DATA:', data);
@@ -29,21 +32,28 @@ export default function TrackPage() {
           İade Takibi
         </h1>
 
-        <div className="flex gap-3">
-          <input
-            value={trackingId}
-            onChange={(e) => setTrackingId(e.target.value)}
-            placeholder="Sipariş No Gir"
-            className="flex-1 rounded-2xl border p-4"
-          />
+      <div className="space-y-3">
+  <input
+    value={trackingId}
+    onChange={(e) => setTrackingId(e.target.value)}
+    placeholder="Sipariş No Gir"
+    className="w-full rounded-2xl border p-4"
+  />
 
-          <button
-            onClick={searchRequest}
-            className="rounded-2xl bg-black px-6 text-white font-bold"
-          >
-            Sorgula
-          </button>
-        </div>
+  <input
+    value={email}
+    onChange={(e) => setEmail(e.target.value)}
+    placeholder="E-posta Adresiniz"
+    className="w-full rounded-2xl border p-4"
+  />
+
+  <button
+    onClick={searchRequest}
+    className="w-full rounded-2xl bg-black py-4 text-white font-bold"
+  >
+    Sorgula
+  </button>
+</div>
 
         {request && (
           <div className="mt-8 rounded-3xl bg-white p-6 border">
