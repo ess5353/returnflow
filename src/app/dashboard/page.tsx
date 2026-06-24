@@ -79,11 +79,14 @@ const filteredRequests = requests.filter((r) => {
   const matchesFilter =
     filter === 'Tümü' || r.status === filter;
 
-  const matchesSearch =
+ const matchesSearch =
   (r.customer_name || '')
     .toLowerCase()
     .includes(search.toLowerCase()) ||
   (r.order_id || '')
+    .toLowerCase()
+    .includes(search.toLowerCase()) ||
+  (r.rf_number || '')
     .toLowerCase()
     .includes(search.toLowerCase());
 

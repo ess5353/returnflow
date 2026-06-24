@@ -18,3 +18,21 @@ export const GET_AUTHORIZED_APP = gql`
     }
   }
 `;
+
+export const TEST_ORDERS = gql`
+  query listOrder {
+    listOrder {
+      page
+      count
+      data {
+      id
+      orderNumber
+      customer {
+      firstName
+      lastName
+      email
+      }
+      }
+    }
+  }
+`;

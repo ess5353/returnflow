@@ -25,6 +25,26 @@ export interface GetAuthorizedAppQuery {
   getAuthorizedApp: GetAuthorizedAppQueryData;
 }
 
+export type ListOrderQueryVariables = {}
+
+export type ListOrderQueryData = {
+  page: number;
+  count: number;
+  data: Array<{
+  id: string;
+  orderNumber?: string;
+  customer?: {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+};
+}>;
+}
+
+export interface ListOrderQuery {
+  listOrder: ListOrderQueryData;
+}
+
 export class GeneratedQueries {
   client: BaseGraphQLAPIClient<any>;
 
@@ -55,6 +75,27 @@ export class GeneratedQueries {
   }
 `;
     return this.client.query<Partial<GetAuthorizedAppQuery>>({ query });
+  }
+
+  async listOrder(): Promise<APIResult<Partial<ListOrderQuery>>> {
+    const query = `
+  query listOrder {
+    listOrder {
+      page
+      count
+      data {
+      id
+      orderNumber
+      customer {
+      firstName
+      lastName
+      email
+      }
+      }
+    }
+  }
+`;
+    return this.client.query<Partial<ListOrderQuery>>({ query });
   }
 }
 
