@@ -127,7 +127,12 @@ console.log("authorizedAppResponse", authorizedAppResponse);
     } as AuthToken;
 
     // Store the token for future use
-   await AuthTokenManager.put(token);
+    try {await AuthTokenManager.put(token);
+   console.log("TOKEN SAVED");
+  } catch (e) {
+    console.error("TOKEN SAVE ERROR:",e);
+  }
+  
 
     // Update session with new merchant and app IDs, clear state, and set expiration
     session.expiresAt = new Date(Date.now() + 3600 * 1000);
