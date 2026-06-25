@@ -29,6 +29,7 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState('Tümü');
   const [search, setSearch] = useState('');
   const [adminNote, setAdminNote] = useState('');
+  const [dateFilter, setDateFilter] = useState('Tümü');
 
 
 
@@ -95,19 +96,48 @@ const filteredRequests = requests.filter((r) => {
   const matchesFilter =
     filter === 'Tümü' || r.status === filter;
 
- const matchesSearch =
-  (r.customer_name || '')
-    .toLowerCase()
-    .includes(search.toLowerCase()) ||
-  (r.order_id || '')
-    .toLowerCase()
-    .includes(search.toLowerCase()) ||
-  (r.rf_number || '')
-    .toLowerCase()
-    .includes(search.toLowerCase());
+  const matchesSearch =
+    (r.customer_name || '')
+      .toLowerCase()
+      .includes(search.toLowerCase()) ||
+    (r.order_id || '')
+      .toLowerCase()
+      .includes(search.toLowerCase()) ||
+    (r.rf_number || '')
+      .toLowerCase()
+      .includes(search.toLowerCase());
 
-  return matchesFilter && matchesSearch;
+  const createdAt = new Date(r.created_at);
+  const now = new Date();
+
+  let matchesDate = true;
+
+  if (dateFilter === 'Bugün') {
+    matchesDate =
+      createdAt.toDateString() === now.toDateString();
+  }
+
+  if (dateFilter === 'Son 7 Gün') {
+    matchesDate =
+      createdAt >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  }
+
+  if (dateFilter === 'Son 30 Gün') {
+    matchesDate =
+      createdAt >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  }
+
+  if (dateFilter === 'Bu Ay') {
+    matchesDate =
+      createdAt.getMonth() === now.getMonth() &&
+      createdAt.getFullYear() === now.getFullYear();
+  }
+
+  return matchesFilter && matchesSearch && matchesDate;
 });
+
+
+
   const selected = selectedRequest;
 
 const reasonCounts = requests.reduce((acc: any, item) => {
@@ -151,6 +181,21 @@ const topReason =
           >
             Yenile
           </button>
+          <div className="mt-4 flex flex-wrap gap-2">
+  {['Bugün', 'Son 7 Gün', 'Son 30 Gün', 'Bu Ay', 'Tümü'].map((item) => (
+    <button
+      key={item}
+      onClick={() => setDateFilter(item)}
+      className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+        dateFilter === item
+          ? 'bg-black text-white'
+          : 'bg-gray-100 text-black'
+      }`}
+    >
+      {item}
+    </button>
+  ))}
+</div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.9fr] gap-5">
