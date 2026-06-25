@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     const ikas = getIkas(authToken);
-
+console.log(Object.keys(ikas.queries));
     const response = await ikas.queries.listOrder();
 
     const orders =
