@@ -167,9 +167,17 @@ const topReason =
                   https://returnflow.pelyxcommerce.com/pelyxcommerce
                 </span>
 
-                <button className="rounded-xl bg-white px-5 py-3 font-extrabold text-black">
-                  Kopyala
-                </button>
+                <button
+  onClick={() => {
+    navigator.clipboard.writeText(
+      'https://returnflow-git-main-ess7.vercel.app/returns'
+    );
+    alert('Portal linki kopyalandı');
+  }}
+  className="rounded-xl bg-white px-5 py-3 font-extrabold text-black"
+>
+  Kopyala
+</button>
               </div>
             </div>
 
