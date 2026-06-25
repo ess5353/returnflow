@@ -81,13 +81,18 @@ export class AuthTokenManager {
     if (error) throw error;
   }
 
-  static async list(): Promise<AuthToken[]> {
-    const { data, error } = await supabaseAdmin
-      .from('auth_tokens')
-      .select('*');
+ static async list(): Promise<AuthToken[]> {
+  const result = await supabaseAdmin
+    .from('auth_tokens')
+    .select('*');
 
-    if (error) return [];
+  console.log('SUPABASE RAW:', result);
 
-    return data.map(this.toModel);
+  if (result.error) {
+    console.error(result.error);
+    return [];
   }
+
+  return result.data.map(this.toModel);
+}
 }
