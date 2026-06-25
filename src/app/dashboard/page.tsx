@@ -24,6 +24,7 @@ type ReturnRequest = {
 
 export default function DashboardPage() {
   const [requests, setRequests] = useState<ReturnRequest[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('Tümü');
@@ -50,24 +51,27 @@ export default function DashboardPage() {
     setLoading(false);
   };
 
+const fetchOrders = async () => {
+  const token = await TokenHelpers.getTokenForIframeApp();
+
+  const response = await fetch('/api/ikas/orders', {
+    headers: {
+      Authorization: `JWT ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  console.log('IKAS ORDERS:', data);
+
+  if (data.success) {
+    setOrders(data.orders);
+  }
+};
+
   useEffect(() => {
   fetchRequests();
-
-  (async () => {
-    const token = await TokenHelpers.getTokenForIframeApp();
-
-    console.log('IKAS TOKEN:', token);
-
-    const response = await fetch('/api/ikas/orders', {
-      headers: {
-        Authorization: `JWT ${token}`,
-      },
-    });
-
-    const data = await response.json();
-
-    console.log('IKAS ORDERS:', data);
-  })();
+  fetchOrders();
 }, []);
 
   const updateStatus = async (status: string) => {
@@ -176,7 +180,10 @@ const topReason =
           </div>
 
           <button
-            onClick={fetchRequests}
+            onClick={() => {
+  fetchRequests();
+  fetchOrders();
+}}
             className="rounded-2xl bg-black px-6 py-4 font-bold text-white shadow-xl"
           >
             Yenile
