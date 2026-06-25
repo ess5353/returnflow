@@ -6,7 +6,10 @@ import { getIkas } from '@/helpers/api-helpers';
 export async function GET(request: NextRequest) {
   try {
     const user = getUserFromRequest(request);
+console.log('JWT USER:', user);
 
+const allTokens = await AuthTokenManager.list();
+console.log('DB TOKENS:', allTokens);
     if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
