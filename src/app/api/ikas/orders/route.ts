@@ -6,10 +6,7 @@ import { getIkas } from '@/helpers/api-helpers';
 export async function GET(request: NextRequest) {
   try {
     const user = getUserFromRequest(request);
-console.log('JWT USER:', user);
 
-const allTokens = await AuthTokenManager.list();
-console.log('DB TOKENS:', allTokens);
     if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -31,18 +28,50 @@ console.log('DB TOKENS:', allTokens);
     const ikas = getIkas(authToken);
 
     const response = await ikas.queries.listOrder();
-console.log('LIST ORDER RESPONSE:', JSON.stringify(response, null, 2));
 
-    return NextResponse.json(response.data);
-  } catch (error: any) {
-  console.error('ORDERS ERROR:', error);
+    const orders =
+      response.data?.listOrder?.data?.map((order: any) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        createdAt: order.createdAt,
+        status: order.status,
 
-  return NextResponse.json(
-    {
-      error: 'Failed',
-      details: String(error),
-    },
-    { status: 500 }
-  );
-}
+        customerName:
+          order.customer?.fullName ||
+          order.customer?.name ||
+          '-',
+
+        totalPrice:
+          order.totalPrice ||
+          order.total ||
+          0,
+
+        currency:
+          order.currency ||
+          'TRY',
+
+        items:
+          order.lineItems ||
+          order.items ||
+          [],
+      })) || [];
+
+    return NextResponse.json({
+      success: true,
+      count: orders.length,
+      orders,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to load orders',
+      },
+      {
+        status: 500,
+      }
+    );
+  }
 }
