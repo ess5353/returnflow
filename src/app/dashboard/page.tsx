@@ -136,11 +136,11 @@ const filteredRequests = requests.filter((r) => {
   return matchesFilter && matchesSearch && matchesDate;
 });
 
-
+const statsRequests = filteredRequests;
 
   const selected = selectedRequest;
 
-const reasonCounts = requests.reduce((acc: any, item) => {
+const reasonCounts = statsRequests.reduce((acc: any, item) => {
   acc[item.reason] = (acc[item.reason] || 0) + 1;
   return acc;
 }, {});
@@ -229,14 +229,14 @@ const topReason =
 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
                 <p className="text-gray-500 font-semibold">Toplam İade</p>
                 <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-                  {requests.length}
+                  {statsRequests.length}
                 </h3>
               </div>
 
               <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
                 <p className="text-gray-500 font-semibold">Yeni Talep</p>
                 <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-                  {requests.filter((r) => r.status === 'Yeni Talep').length}
+                  {statsRequests.filter((r) => r.status === 'Yeni Talep').length}
                 </h3>
               </div>
 
@@ -244,7 +244,7 @@ const topReason =
   <p className="text-gray-500 font-semibold">Onaylanan</p>
 
   <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-    {requests.filter((r) => r.status === 'Onaylandı').length}
+   {statsRequests.filter((r) => r.status === 'Onaylandı').length}
   </h3>
 </div>
 
@@ -254,7 +254,7 @@ const topReason =
 
 
   <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-    {requests.filter((r) => r.status === 'Reddedildi').length}
+   {statsRequests.filter((r) => r.status === 'Reddedildi').length}
   </h3>
 </div>
 
@@ -294,7 +294,11 @@ const topReason =
           <div
             className="h-full rounded-full bg-black"
             style={{
-              width: `${Math.min((Number(count) / requests.length) * 100, 100)}%`,
+              width: `${
+  statsRequests.length
+    ? Math.min((Number(count) / statsRequests.length) * 100, 100)
+    : 0
+}%`,
             }}
           />
         </div>
