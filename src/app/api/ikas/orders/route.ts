@@ -34,32 +34,32 @@ console.log(
   'RAW RESPONSE:',
   JSON.stringify(response, null, 2)
 );
-    const orders =
-      response.data?.listOrder?.data?.map((order: any) => ({
-        id: order.id,
-        orderNumber: order.orderNumber,
-        createdAt: order.createdAt,
-        status: order.status,
+    
+        const orders =
+  response.data?.listOrder?.data?.map((order: any) => ({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    createdAt: order.orderedAt,
+    status: order.status,
 
-        customerName:
-          order.customer?.fullName ||
-          order.customer?.name ||
-          '-',
+    customerName: [
+      order.customer?.firstName,
+      order.customer?.lastName,
+    ]
+      .filter(Boolean)
+      .join(' ') || '-',
 
-        totalPrice:
-          order.totalPrice ||
-          order.total ||
-          0,
+    totalPrice: order.totalPrice,
+    currency: order.currencyCode,
 
-        currency:
-          order.currency ||
-          'TRY',
-
-        items:
-          order.lineItems ||
-          order.items ||
-          [],
-      })) || [];
+    items:
+      order.orderLineItems?.map((item: any) => ({
+        name: item.variant?.name,
+        sku: item.variant?.sku,
+        quantity: item.quantity,
+        price: item.finalPrice,
+      })) || [],
+  })) || [];
 
     return NextResponse.json({
       success: true,

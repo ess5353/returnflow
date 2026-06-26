@@ -20,19 +20,36 @@ export const GET_AUTHORIZED_APP = gql`
 `;
 
 export const TEST_ORDERS = gql`
-  query listOrder {
-    listOrder {
-      page
-      count
-      data {
+query listOrder {
+  listOrder {
+    page
+    count
+    data {
       id
       orderNumber
+      orderedAt
+      status
+      currencyCode
+      totalPrice
+      totalFinalPrice
+
       customer {
-      firstName
-      lastName
-      email
+        firstName
+        lastName
+        email
       }
+
+      orderLineItems {
+        quantity
+        finalPrice
+
+        variant {
+          id
+          name
+          sku
+        }
       }
     }
   }
+}
 `;

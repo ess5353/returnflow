@@ -33,11 +33,25 @@ export type ListOrderQueryData = {
   data: Array<{
   id: string;
   orderNumber?: string;
+  orderedAt?: number;
+  status: string;
+  currencyCode: string;
+  totalPrice: number;
+  totalFinalPrice: number;
   customer?: {
   firstName?: string;
   lastName?: string;
   email?: string;
 };
+  orderLineItems: Array<{
+  quantity: number;
+  finalPrice?: number;
+  variant: {
+  id?: string;
+  name: string;
+  sku?: string;
+};
+}>;
 }>;
 }
 
@@ -79,21 +93,38 @@ export class GeneratedQueries {
 
   async listOrder(): Promise<APIResult<Partial<ListOrderQuery>>> {
     const query = `
-  query listOrder {
-    listOrder {
-      page
-      count
-      data {
+query listOrder {
+  listOrder {
+    page
+    count
+    data {
       id
       orderNumber
+      orderedAt
+      status
+      currencyCode
+      totalPrice
+      totalFinalPrice
+
       customer {
-      firstName
-      lastName
-      email
+        firstName
+        lastName
+        email
       }
+
+      orderLineItems {
+        quantity
+        finalPrice
+
+        variant {
+          id
+          name
+          sku
+        }
       }
     }
   }
+}
 `;
     return this.client.query<Partial<ListOrderQuery>>({ query });
   }
