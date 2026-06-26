@@ -30,7 +30,10 @@ console.log('IKAS:', ikas);
 console.log('IKAS KEYS:', Object.keys(ikas));
 console.log('CLIENT KEYS:', Object.keys((ikas as any).client || {}));
     const response = await ikas.queries.listOrder();
-
+console.log(
+  'RAW RESPONSE:',
+  JSON.stringify(response, null, 2)
+);
     const orders =
       response.data?.listOrder?.data?.map((order: any) => ({
         id: order.id,
