@@ -314,7 +314,48 @@ const topReason =
   </div>
 </div>
 
+<div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
+  <h2 className="text-2xl md:text-3xl font-bold tracking-[-0.05em]">
+    İkas Son Siparişler
+  </h2>
 
+  <p className="mt-1 text-gray-500">
+    Mağazanızdan gelen son siparişler.
+  </p>
+
+  <div className="mt-6 space-y-3">
+    {orders.map((order) => (
+      <div
+        key={order.id}
+        className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 rounded-3xl border border-gray-100 bg-[#fafafa] p-5 md:items-center"
+      >
+        <div>
+          <p className="text-sm text-gray-400">Sipariş</p>
+          <strong>#{order.orderNumber}</strong>
+        </div>
+
+        <div>
+          <p className="text-sm text-gray-400">Müşteri</p>
+          <strong>{order.customerName}</strong>
+        </div>
+
+        <div>
+          <p className="text-sm text-gray-400">Ürün</p>
+          <strong>{order.items?.[0]?.name || '-'}</strong>
+        </div>
+
+        <div className="text-left md:text-right">
+          <p className="font-bold">
+            ₺{order.totalPrice}
+          </p>
+          <span className="text-xs font-bold text-gray-500">
+            {order.status}
+          </span>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
 
             <div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
               <div className="mb-6">
