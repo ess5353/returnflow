@@ -25,11 +25,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const ikas = getIkas(authToken);
+const ikas = getIkas(authToken);
 
-    const response = await ikas.queries.listOrder();
+console.log("BEFORE LIST ORDER");
 
-    console.log("ALL ORDERS:", JSON.stringify(response.data, null, 2));
+const response = await ikas.queries.listOrder();
+
+console.log("AFTER LIST ORDER");
+console.log("RESPONSE:", response);
+console.log("DATA:", response.data);
+console.log("ALL ORDERS:", JSON.stringify(response.data, null, 2));
 
     return NextResponse.json({
       success: true
