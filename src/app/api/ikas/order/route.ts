@@ -30,6 +30,12 @@ const ikas = getIkas(authToken);
 console.log("BEFORE LIST ORDER");
 
 const response = await ikas.queries.listOrder();
+
+console.log(
+  "ORDER NUMBERS:",
+  response.data?.listOrder?.data?.map((o: any) => o.orderNumber)
+);
+
 const order = response.data?.listOrder?.data?.find(
   (o: any) => o.orderNumber === orderNo
 );
