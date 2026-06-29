@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { TokenHelpers } from '@/helpers/token-helpers';
 
 export default function ReturnsPage() {
   const [step, setStep] = useState<'search' | 'order' | 'reason' | 'success'>('search');
@@ -112,29 +113,28 @@ if (
 }
   console.log('Aranan:', orderNo);
 
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('order_no', orderNo);
+ const token = await TokenHelpers.getTokenForIframeApp();
 
-  console.log('DATA:', data);
-  console.log('ERROR:', error);
-
-  if (!data || data.length === 0) {
-    alert('Sipariş bulunamadı');
-    return;
+const response = await fetch(
+  `/api/ikas/order?orderNo=${orderNo}`,
+  {
+    headers: {
+      Authorization: `JWT ${token}`,
+    },
   }
-if (
-  data[0].customer_email?.toLowerCase() !==
-  email.toLowerCase()
-) {
-  alert('Sipariş e-postası eşleşmiyor');
+);
+
+const result = await response.json();
+
+console.log(result);
+if (!result.success) {
+  alert('Sipariş bulunamadı');
   return;
 }
 
-
-  setOrder(data[0]);
-  setStep('order');
+setOrder(result.order);
+setStep('order');
+  
 };
   
 

@@ -30,15 +30,21 @@ const ikas = getIkas(authToken);
 console.log("BEFORE LIST ORDER");
 
 const response = await ikas.queries.listOrder();
+const order = response.data?.listOrder?.data?.find(
+  (o: any) => o.orderNumber === orderNo
+);
+
+return NextResponse.json({
+  success: true,
+  order,
+});
 
 console.log("AFTER LIST ORDER");
 console.log("RESPONSE:", response);
 console.log("DATA:", response.data);
 console.log("ALL ORDERS:", JSON.stringify(response.data, null, 2));
 
-    return NextResponse.json({
-      success: true
-    });
+   
 
   } catch (e) {
     console.error(e);
