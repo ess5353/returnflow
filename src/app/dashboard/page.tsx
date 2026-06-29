@@ -347,6 +347,7 @@ const topReason =
         <div className="text-left md:text-right">
           <p className="font-bold">
             ₺{order.totalPrice}
+            
           </p>
           <span className="text-xs font-bold text-gray-500">
             {order.status}
