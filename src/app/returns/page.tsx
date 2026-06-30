@@ -115,15 +115,22 @@ if (
 
  const token = await TokenHelpers.getTokenForIframeApp();
 
+console.log("ORDER NO STATE:", orderNo);
+console.log("EMAIL STATE:", email);
+
+console.log(
+  "URL:",
+  `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}`
+);
+
 const response = await fetch(
-  `/api/ikas/order?orderNo=${orderNo}`,
+  `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}`,
   {
     headers: {
       Authorization: `JWT ${token}`,
     },
   }
 );
-
 const result = await response.json();
 
 console.log(result);
