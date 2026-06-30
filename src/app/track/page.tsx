@@ -14,8 +14,8 @@ const [notFound, setNotFound] = useState(false);
   const { data, error } = await supabase
     .from('return_requests')
     .select('*')
-    .eq('order_id', trackingId)
-      .eq('customer_email', email);
+    .or(`order_id.eq.${trackingId},rf_number.eq.${trackingId}`)
+.eq('customer_email', email);
 
   console.log('TRACKING ID:', trackingId);
   console.log('DATA:', data);
@@ -47,7 +47,7 @@ const [notFound, setNotFound] = useState(false);
   <input
     value={trackingId}
     onChange={(e) => setTrackingId(e.target.value)}
-    placeholder="Sipariş No Gir"
+    placeholder="Sipariş No veya RF Takip No Gir"
     className="w-full rounded-2xl border p-4"
   />
 
@@ -79,8 +79,11 @@ const [notFound, setNotFound] = useState(false);
         {request && (
           <div className="mt-8 rounded-3xl bg-white p-6 border">
             <h2 className="text-2xl font-bold">
-              {request.order_id}
-              <p className="mt-2 text-gray-500">
+{request.rf_number}    
+<p className="mt-2 text-gray-500">
+  Sipariş No: {request.order_id}
+</p>
+          <p className="mt-2 text-gray-500">
   {new Date(request.created_at).toLocaleDateString('tr-TR')}
 </p>
             </h2>
