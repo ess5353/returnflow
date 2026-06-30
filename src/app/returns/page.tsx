@@ -123,8 +123,7 @@ console.log("EMAIL STATE:", email);
 
 console.log(
   "URL:",
-  `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}`
-);
+`/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}&email=${encodeURIComponent(email)}`);
 
 const response = await fetch(
   `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}`,

@@ -5,7 +5,7 @@ import { getIkas } from '@/helpers/api-helpers';
 export async function GET(request: NextRequest) {
   try {
     const orderNo = request.nextUrl.searchParams.get('orderNo');
-
+const email = request.nextUrl.searchParams.get('email');
     if (!orderNo) {
       return NextResponse.json(
         { success: false, error: 'Order no required' },
@@ -40,6 +40,16 @@ console.log(
         error: 'Order not found',
       });
     }
+
+    if (
+  !email ||
+  rawOrder.customer?.email?.toLowerCase() !== email.toLowerCase()
+) {
+  return NextResponse.json({
+    success: false,
+    error: 'E-posta eşleşmiyor',
+  });
+}
 
     const order = {
       id: rawOrder.id,
