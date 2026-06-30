@@ -18,6 +18,7 @@ type ReturnRequest = {
   status: string;
   created_at: string;
   media_urls: string [] | null;
+  customer_email: string | null;
 };
 
 
@@ -438,9 +439,12 @@ const topReason =
                         <p className="mt-2 text-gray-500">
                           {request.order_id} — {request.customer_name}
                         </p>
+
                         <p className="mt-1 font-semibold">{request.product}</p>
                       </div>
-
+<p className="mt-1 text-sm text-gray-400">
+  {request.customer_email || 'E-posta yok'}
+</p>
                       <div>
                         <p className="text-sm text-gray-400">Sebep</p>
                         <strong>{request.reason}</strong>
@@ -487,6 +491,11 @@ const topReason =
                     <p className="text-sm text-gray-400">Müşteri</p>
                     <strong>{selected.customer_name}</strong>
                   </div>
+
+<div>
+  <p className="text-sm text-gray-400">E-posta</p>
+  <strong>{selected.customer_email || '-'}</strong>
+</div>
 
                   <div>
                     <p className="text-sm text-gray-400">Ürün</p>
