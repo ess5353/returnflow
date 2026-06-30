@@ -358,7 +358,16 @@ setStep('order');
                   <div className="mt-8 rounded-3xl bg-gray-50 border border-gray-100 p-5 text-left">
                     <p className="text-gray-500 text-sm">Talep No</p>
                     <h3 className="text-2xl font-bold">{createdRfNumber}</h3>
+<p className="mt-4 text-sm text-gray-500">
+  Talebinizi takip etmek için İade Takibi sayfasına gidip bu RF numarasını veya sipariş numaranızı kullanabilirsiniz.
+</p>
 
+<a
+  href="/track"
+  className="mt-4 inline-flex rounded-2xl bg-black px-5 py-3 font-bold text-white"
+>
+  İade Takibine Git
+</a>
                     <p className="text-gray-500 text-sm mt-5">Durum</p>
                     <h3 className="text-xl font-bold">İncelemede</h3>
 
