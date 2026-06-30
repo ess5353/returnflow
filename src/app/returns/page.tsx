@@ -14,7 +14,9 @@ export default function ReturnsPage() {
   const [orderNo, setOrderNo] = useState('');
 const [order, setOrder] = useState<any>(null);
 const [createdRfNumber, setCreatedRfNumber] = useState('');
-  
+const [selectedItems, setSelectedItems] = useState<any[]>([]);  
+
+
 const createReturnRequest = async () => {
   setIsSubmitting(true);
   console.log('DESCRIPTION:', description);
@@ -78,10 +80,11 @@ const rfNumber = `RF-${datePart}-${sequence}`;
         order_id: order.order_no,
         customer_name: order.customer_name,
         customer_email: email,
-        product: order.product,
-        reason,
+product: selectedItems.map((item) => item.name).join(', '),        reason,
         description,
-        amount: order.amount,
+        amount: String(
+  selectedItems.reduce((total, item) => total + Number(item.price || 0), 0)
+),
         status: 'Yeni Talep',
         media_urls: uploadedUrls,
       },
@@ -228,9 +231,32 @@ setStep('order');
                     <h3 className="text-2xl font-bold">{order.id}</h3>
 
                     <div className="mt-5">
-                      <p className="text-gray-500 text-sm">Ürün</p>
-                      <h3 className="text-xl font-bold">{order.product}</h3>
-                    </div>
+  <p className="text-gray-500 text-sm mb-3">İade edilecek ürünler</p>
+
+  <div className="space-y-3">
+    {order.items?.map((item: any, index: number) => {
+      const checked = selectedItems.some((x) => x.name === item.name);
+
+      return (
+        <button
+          key={index}
+          onClick={() => {
+            if (checked) {
+              setSelectedItems(selectedItems.filter((x) => x.name !== item.name));
+            } else {
+              setSelectedItems([...selectedItems, item]);
+            }
+          }}
+          className={`w-full rounded-2xl border px-4 py-4 text-left font-bold ${
+            checked ? 'border-black bg-black text-white' : 'border-gray-200 bg-white text-black'
+          }`}
+        >
+          {checked ? '✓ ' : ''}{item.name} — {item.quantity} adet — ₺{item.price}
+        </button>
+      );
+    })}
+  </div>
+</div>
 
                     <div className="mt-5">
                       <p className="text-gray-500 text-sm">Tutar</p>
@@ -239,11 +265,12 @@ setStep('order');
                   </div>
 
                   <button
-                    onClick={() => setStep('reason')}
-                    className="w-full rounded-2xl bg-black text-white py-5 font-extrabold shadow-lg"
-                  >
-                    Bu Ürünü İade Et
-                  </button>
+  disabled={selectedItems.length === 0}
+  onClick={() => setStep('reason')}
+  className="w-full rounded-2xl bg-black text-white py-5 font-extrabold shadow-lg disabled:opacity-30"
+>
+  Seçili Ürünlerle Devam Et
+</button>
                 </>
               )}
 
