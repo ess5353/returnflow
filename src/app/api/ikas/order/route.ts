@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
     const ikas = getIkas(authToken);
 
     const response = await ikas.queries.listOrder();
-
+console.log(
+  "ORDERS:",
+  JSON.stringify(response.data?.listOrder?.data, null, 2)
+);
     const rawOrder = response.data?.listOrder?.data?.find(
       (o: any) => String(o.orderNumber) === String(orderNo).replace('#', '')
     );
