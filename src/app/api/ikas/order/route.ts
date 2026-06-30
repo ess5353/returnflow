@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
 
@@ -7,16 +6,15 @@ export async function GET(request: NextRequest) {
   try {
     const orderNo = request.nextUrl.searchParams.get('orderNo');
 
-    const user = getUserFromRequest(request);
-
-    if (!user) {
+    if (!orderNo) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: 'Order no required' },
+        { status: 400 }
       );
     }
 
-    const authToken = await AuthTokenManager.get(user.authorizedAppId);
+    const tokens = await AuthTokenManager.list();
+    const authToken = tokens.find((t) => !t.deleted);
 
     if (!authToken) {
       return NextResponse.json(
@@ -25,43 +23,52 @@ export async function GET(request: NextRequest) {
       );
     }
 
-const ikas = getIkas(authToken);
+    const ikas = getIkas(authToken);
 
-console.log("BEFORE LIST ORDER");
+    const response = await ikas.queries.listOrder();
 
-const response = await ikas.queries.listOrder();
+    const rawOrder = response.data?.listOrder?.data?.find(
+      (o: any) => String(o.orderNumber) === String(orderNo).replace('#', '')
+    );
 
-console.log(
-  "ORDER NUMBERS:",
-  response.data?.listOrder?.data?.map((o: any) => o.orderNumber)
-);
+    if (!rawOrder) {
+      return NextResponse.json({
+        success: false,
+        error: 'Order not found',
+      });
+    }
 
-const order = response.data?.listOrder?.data?.find(
-  (o: any) => o.orderNumber === orderNo
-);
+    const order = {
+      id: rawOrder.id,
+      orderNumber: rawOrder.orderNumber,
+      order_no: rawOrder.orderNumber,
+      customer_name: [rawOrder.customer?.firstName, rawOrder.customer?.lastName]
+        .filter(Boolean)
+        .join(' '),
+      customer_email: rawOrder.customer?.email,
+      amount: rawOrder.totalPrice,
+      totalPrice: rawOrder.totalPrice,
+      currency: rawOrder.currencyCode,
+      status: rawOrder.status,
+      items:
+        rawOrder.orderLineItems?.map((item: any) => ({
+          name: item.variant?.name,
+          sku: item.variant?.sku,
+          quantity: item.quantity,
+          price: item.finalPrice,
+        })) || [],
+    };
 
-return NextResponse.json({
-  success: true,
-  order,
-});
-
-console.log("AFTER LIST ORDER");
-console.log("RESPONSE:", response);
-console.log("DATA:", response.data);
-console.log("ALL ORDERS:", JSON.stringify(response.data, null, 2));
-
-   
-
+    return NextResponse.json({
+      success: true,
+      order,
+    });
   } catch (e) {
     console.error(e);
 
     return NextResponse.json(
-      {
-        success: false,
-      },
-      {
-        status: 500,
-      }
+      { success: false, error: 'Failed' },
+      { status: 500 }
     );
   }
 }
