@@ -20,8 +20,7 @@ export async function POST(request: NextRequest) {
         
       from: 'ReturnFlow <onboarding@resend.dev>',
       to: ['eypsrkc@gmail.com'],
-      subject: 'Yeni İade Talebi - ${rfNumber}',
-      html: `
+subject: `Yeni İade Talebi - ${rfNumber}`,      html: `
         <div style="font-family: Arial; background:#f4f5f7; padding:30px;">
           <div style="max-width:600px; margin:auto; background:white; border-radius:24px; padding:30px;">
             <h2>ReturnFlow</h2>

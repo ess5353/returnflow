@@ -96,7 +96,12 @@ product: selectedItems.map((item) => item.name).join(', '),        reason,
     alert('Kayıt sırasında hata oluştu');
     return;
   }
-
+console.log({
+  email,
+  customerName: order.customer_name,
+  rfNumber,
+  orderNo: order.order_no,
+});
 await fetch('/api/email/return-created', {
   method: 'POST',
   headers: {
