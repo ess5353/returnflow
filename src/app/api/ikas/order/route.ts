@@ -41,6 +41,9 @@ console.log(
       });
     }
 
+console.log("IKAS EMAIL:", rawOrder.customer?.email);
+console.log("GELEN EMAIL:", email);
+
     if (
   !email ||
   rawOrder.customer?.email?.toLowerCase() !== email.toLowerCase()
