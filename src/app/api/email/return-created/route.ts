@@ -17,9 +17,10 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await resend.emails.send({
+        
       from: 'ReturnFlow <onboarding@resend.dev>',
-      to: [email],
-      subject: 'İade Talebiniz Oluşturuldu',
+      to: ['eypsrkc@gmail.com'],
+      subject: 'Yeni İade Talebi - ${rfNumber}',
       html: `
         <div style="font-family: Arial; background:#f4f5f7; padding:30px;">
           <div style="max-width:600px; margin:auto; background:white; border-radius:24px; padding:30px;">
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
             <div style="background:#f4f5f7; padding:20px; border-radius:16px; margin-top:20px;">
               <p><strong>RF No:</strong> ${rfNumber}</p>
               <p><strong>Sipariş No:</strong> ${orderNo}</p>
+              <p><strong>Müşteri E-posta:</strong> ${email}</p>
               <p><strong>Durum:</strong> İncelemede</p>
             </div>
 
