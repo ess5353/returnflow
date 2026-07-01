@@ -96,6 +96,20 @@ product: selectedItems.map((item) => item.name).join(', '),        reason,
     alert('Kayıt sırasında hata oluştu');
     return;
   }
+
+await fetch('/api/email/return-created', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    email,
+    customerName: order.customer_name,
+    rfNumber,
+    orderNo: order.order_no,
+  }),
+});
+
   setCreatedRfNumber(rfNumber);
 setIsSubmitting(false);
   setStep('success');
