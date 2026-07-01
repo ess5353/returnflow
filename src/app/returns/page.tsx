@@ -135,19 +135,19 @@ if (
 console.log("ORDER NO STATE:", orderNo);
 console.log("EMAIL STATE:", email);
 
-console.log(
-  "URL:",
-`/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}&email=${encodeURIComponent(email)}`);
+const url = `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}&email=${encodeURIComponent(email)}`;
 
-const response = await fetch(
-  `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}`,
-  {
-    headers: {
-      Authorization: `JWT ${token}`,
-    },
-  }
-);
+console.log("URL:", url);
+
+const response = await fetch(url, {
+  headers: {
+    Authorization: `JWT ${token}`,
+  },
+});
+
 const result = await response.json();
+
+console.log(result);
 
 console.log(result);
 if (!result.success) {
