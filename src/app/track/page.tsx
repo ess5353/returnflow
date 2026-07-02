@@ -106,6 +106,29 @@ const [notFound, setNotFound] = useState(false);
               <strong>Sebep:</strong> {request.reason}
             </p>
 
+{request.products && request.products.length > 0 && (
+  <div className="mt-6">
+    <p className="font-bold mb-3">
+      İade Edilen Ürünler
+    </p>
+
+    <div className="space-y-3">
+      {request.products.map((item: any, index: number) => (
+        <div
+          key={index}
+          className="rounded-2xl border border-gray-200 p-4"
+        >
+          <p className="font-bold">{item.name}</p>
+
+          <p className="mt-1 text-sm text-gray-500">
+            {item.quantity} Adet • ₺{item.price}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
           {request.description && (
   <p className="mt-2">
     <strong>Açıklama:</strong> {request.description}

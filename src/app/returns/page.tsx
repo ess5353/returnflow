@@ -81,7 +81,11 @@ const rfNumber = `RF-${datePart}-${sequence}`;
         customer_name: order.customer_name,
         customer_email: email,
 product: selectedItems.map((item) => item.name).join(', '),        reason,
-products: selectedItems,
+products: selectedItems.map((item) => ({
+  name: item.name,
+  quantity: item.quantity,
+  price: item.price,
+})),
         description,
         amount: String(
   selectedItems.reduce((total, item) => total + Number(item.price || 0), 0)

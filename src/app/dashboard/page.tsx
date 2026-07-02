@@ -10,14 +10,24 @@ type ReturnRequest = {
   order_id: string;
   rf_number: string;
   customer_name: string;
+
   product: string;
+
+  products:
+    | {
+        name: string;
+        quantity: number;
+        price: number;
+      }[]
+    | null;
+
   reason: string;
   description: string | null;
   admin_note: string | null;
   amount: string;
   status: string;
   created_at: string;
-  media_urls: string [] | null;
+  media_urls: string[] | null;
   customer_email: string | null;
 };
 
@@ -102,15 +112,21 @@ const filteredRequests = requests.filter((r) => {
     filter === 'Tümü' || r.status === filter;
 
   const matchesSearch =
-    (r.customer_name || '')
-      .toLowerCase()
-      .includes(search.toLowerCase()) ||
-    (r.order_id || '')
-      .toLowerCase()
-      .includes(search.toLowerCase()) ||
-    (r.rf_number || '')
-      .toLowerCase()
-      .includes(search.toLowerCase());
+  (r.customer_name || '')
+    .toLowerCase()
+    .includes(search.toLowerCase()) ||
+
+  (r.customer_email || '')
+    .toLowerCase()
+    .includes(search.toLowerCase()) ||
+
+  (r.order_id || '')
+    .toLowerCase()
+    .includes(search.toLowerCase()) ||
+
+  (r.rf_number || '')
+    .toLowerCase()
+    .includes(search.toLowerCase());
 
   const createdAt = new Date(r.created_at);
   const now = new Date();
@@ -142,7 +158,10 @@ const filteredRequests = requests.filter((r) => {
 });
 
 const statsRequests = filteredRequests;
-
+const totalReturnAmount = statsRequests.reduce(
+  (total, item) => total + Number(item.amount || 0),
+  0
+);
   const selected = selectedRequest;
 
 const reasonCounts = statsRequests.reduce((acc: any, item) => {
@@ -268,6 +287,17 @@ const topReason =
 
 <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
   <p className="text-gray-500 font-semibold">
+    Toplam İade Tutarı
+  </p>
+
+  <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
+    ₺{totalReturnAmount.toLocaleString('tr-TR')}
+  </h3>
+</div>
+
+
+<div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
+  <p className="text-gray-500 font-semibold">
     En Çok İade Sebebi
   </p>
 
@@ -374,8 +404,7 @@ const topReason =
     type="text"
     value={search}
     onChange={(e) => setSearch(e.target.value)}
-    placeholder="Sipariş no veya müşteri ara..."
-    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-black"
+placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-black"
   />
 </div>
   {['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'].map((item) => (
@@ -497,10 +526,30 @@ const topReason =
   <strong>{selected.customer_email || '-'}</strong>
 </div>
 
-                  <div>
-                    <p className="text-sm text-gray-400">Ürün</p>
-                    <strong>{selected.product}</strong>
-                  </div>
+                <div>
+  <p className="text-sm text-gray-400 mb-3">
+    İade Edilen Ürünler
+  </p>
+
+  {selected.products && selected.products.length > 0 ? (
+    <div className="space-y-3">
+      {selected.products.map((item, index) => (
+        <div
+          key={index}
+          className="rounded-2xl bg-[#f4f5f7] p-4"
+        >
+          <p className="font-bold">{item.name}</p>
+
+          <p className="text-sm text-gray-500 mt-1">
+            {item.quantity} Adet • ₺{item.price}
+          </p>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <strong>{selected.product}</strong>
+  )}
+</div>  
 
                 <div>
   <p className="text-sm text-gray-400">İade Sebebi</p>
