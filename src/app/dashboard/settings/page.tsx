@@ -68,11 +68,13 @@ const saveSettings = async () => {
       return_policy: returnPolicy,
     });
 
-  if (error) {
-    console.error(error);
-    alert('Ayarlar kaydedilemedi.');
-    return;
-  }
+ if (error) {
+  console.error(error);
+
+  alert(JSON.stringify(error, null, 2));
+
+  return;
+}
 
   alert('Ayarlar kaydedildi.');
 };
