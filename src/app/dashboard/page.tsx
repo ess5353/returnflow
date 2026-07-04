@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
-
+import Link from 'next/link';
 
 type ReturnRequest = {
   id: string;
@@ -199,15 +199,25 @@ const topReason =
             </p>
           </div>
 
-          <button
-            onClick={() => {
-  fetchRequests();
-  fetchOrders();
-}}
-            className="rounded-2xl bg-black px-6 py-4 font-bold text-white shadow-xl"
-          >
-            Yenile
-          </button>
+   <div className="flex gap-3">
+  <Link
+    href="/dashboard/settings"
+    className="rounded-2xl border border-gray-200 bg-white px-6 py-4 font-bold"
+  >
+    ⚙️ Ayarlar
+  </Link>
+
+  <button
+    onClick={() => {
+      fetchRequests();
+      fetchOrders();
+    }}
+    className="rounded-2xl bg-black px-6 py-4 font-bold text-white shadow-xl"
+  >
+    Yenile
+  </button>
+</div>
+
           <div className="mt-4 flex flex-wrap gap-2">
   {['Bugün', 'Son 7 Gün', 'Son 30 Gün', 'Bu Ay', 'Tümü'].map((item) => (
     <button
