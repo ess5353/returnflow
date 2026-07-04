@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
 
@@ -12,10 +12,14 @@ export default function ReturnsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState('');
   const [orderNo, setOrderNo] = useState('');
+  const [settings, setSettings] = useState<any>(null);
 const [order, setOrder] = useState<any>(null);
 const [createdRfNumber, setCreatedRfNumber] = useState('');
 const [selectedItems, setSelectedItems] = useState<any[]>([]);  
 
+useEffect(() => {
+  loadSettings();
+}, []);
 
 const createReturnRequest = async () => {
   setIsSubmitting(true);
@@ -125,6 +129,31 @@ setIsSubmitting(false);
   setStep('success');
 };
 
+const loadSettings = async () => {
+  const token = await TokenHelpers.getTokenForIframeApp();
+
+  const response = await fetch('/api/ikas/get-merchant', {
+    headers: {
+      Authorization: `JWT ${token}`,
+    },
+  });
+
+  const result = await response.json();
+
+  if (!result.success) return;
+
+  const { data } = await supabase
+    .from('store_settings')
+    .select('*')
+    .eq('merchant_id', result.merchant.id)
+    .single();
+
+  if (data) {
+    setSettings(data);
+  }
+};
+
+
 const findOrder = async () => {
   const existingRequest = await supabase
   .from('return_requests')
@@ -176,21 +205,41 @@ setStep('order');
       <section className="mx-auto max-w-5xl">
         <div className="rounded-[32px] md:rounded-[44px] bg-white shadow-2xl overflow-hidden border border-gray-100">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr]">
-            <div className="bg-black text-white p-8 md:p-12 relative overflow-hidden">
+            <div style={{
+  background: settings?.primary_color || '#000000',
+}}
+className="text-white p-8 md:p-12 relative overflow-hidden"
+>
               <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gradient-to-br from-blue-300 to-indigo-500 opacity-40" />
 
               <div className="relative z-10">
-                <div className="inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-bold tracking-widest mb-8">
-                  PELYXCOMMERCE
-                </div>
+               <div className="inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-bold tracking-widest mb-8">
+  {settings?.store_name || 'PELYXCOMMERCE'}
+</div>
 
-                <h1 className="text-4xl md:text-6xl font-bold tracking-[-0.07em] leading-none">
-                  İade Merkezi
-                </h1>
+               <h1 className="text-4xl md:text-6xl font-bold tracking-[-0.07em] leading-none">
+  {settings?.store_name || 'İade Merkezi'}
+</h1>
 
                 <p className="text-white/60 mt-5 text-lg leading-8">
                   Sipariş bilgilerinizi girin, iade talebinizi birkaç adımda oluşturun.
                 </p>
+
+{settings?.support_email && (
+  <p className="mt-6 text-sm text-white/70">
+    Destek: {settings.support_email}
+  </p>
+)}
+
+{settings?.return_policy && (
+  <div className="mt-6 rounded-2xl bg-white/10 p-4 text-sm leading-6 text-white/90">
+    <strong>İade Politikası</strong>
+
+    <p className="mt-2 whitespace-pre-line">
+      {settings.return_policy}
+    </p>
+  </div>
+)}
 
                 <div className="mt-10 space-y-4">
                   {['Siparişinizi bulun', 'İade sebebinizi seçin', 'Talebinizi mağazaya iletin'].map(
