@@ -31,12 +31,11 @@ console.log('MERCHANT:', result.merchant);
 
     if (!result.success) return;
 
-    setMerchantId(result.merchant.id);
-
+setMerchantId(result.data.merchantInfo.id);
     const { data } = await supabase
       .from('store_settings')
       .select('*')
-      .eq('merchant_id', result.merchant.id)
+      .eq('merchant_id', result.data.merchantInfo.id)
       .single();
 
     if (data) {
