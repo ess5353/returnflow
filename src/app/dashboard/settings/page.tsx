@@ -55,26 +55,35 @@ const response = await fetch('/api/ikas/get-merchant', {      headers: {
 }, []);
 
 const saveSettings = async () => {
+  if (!merchantId) {
+    alert('Mağaza bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.');
+    return;
+  }
+
   const { error } = await supabase
     .from('store_settings')
-    .upsert({
-      merchant_id: merchantId,
-      store_name: storeName,
-      notification_email: notificationEmail,
-      support_email: supportEmail,
-      logo_url: logoUrl,
-      primary_color: primaryColor,
-      return_address: returnAddress,
-      return_policy: returnPolicy,
-    });
+    .upsert(
+      {
+        merchant_id: merchantId,
+        store_name: storeName,
+        notification_email: notificationEmail,
+        support_email: supportEmail,
+        logo_url: logoUrl,
+        primary_color: primaryColor,
+        return_address: returnAddress,
+        return_policy: returnPolicy,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'merchant_id',
+      }
+    );
 
- if (error) {
-  console.error(error);
-
-  alert(JSON.stringify(error, null, 2));
-
-  return;
-}
+  if (error) {
+    console.error(error);
+    alert(JSON.stringify(error, null, 2));
+    return;
+  }
 
   alert('Ayarlar kaydedildi.');
 };
