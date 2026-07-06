@@ -26,6 +26,9 @@ const response = await fetch('/api/ikas/get-merchant', {      headers: {
 
     const result = await response.json();
 
+    console.log('GET MERCHANT RESULT:', result);
+console.log('MERCHANT:', result.merchant);
+
     if (!result.success) return;
 
     setMerchantId(result.merchant.id);
