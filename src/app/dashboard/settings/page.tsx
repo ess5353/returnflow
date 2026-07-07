@@ -6,7 +6,9 @@ import { TokenHelpers } from '@/helpers/token-helpers';
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
-const [merchantId, setMerchantId] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const [merchantId, setMerchantId] = useState('');
   const [storeName, setStoreName] = useState('');
   const [notificationEmail, setNotificationEmail] = useState('');
   const [supportEmail, setSupportEmail] = useState('');
@@ -15,85 +17,118 @@ const [merchantId, setMerchantId] = useState('');
   const [returnAddress, setReturnAddress] = useState('');
   const [returnPolicy, setReturnPolicy] = useState('');
 
-  useEffect(() => {const loadSettings = async () => {
-  try {
+  const getMerchantId = async () => {
     const token = await TokenHelpers.getTokenForIframeApp();
 
-const response = await fetch('/api/ikas/get-merchant', {      headers: {
+    const response = await fetch('/api/ikas/get-merchant', {
+      headers: {
         Authorization: `JWT ${token}`,
       },
     });
 
     const result = await response.json();
 
-    console.log('GET MERCHANT RESULT:', result);
-console.log('MERCHANT:', result.merchant);
+    const id = result?.data?.merchantInfo?.id;
 
-    if (!result.success) return;
-
-setMerchantId(result.data.merchantInfo.id);
-    const { data } = await supabase
-      .from('store_settings')
-      .select('*')
-      .eq('merchant_id', result.data.merchantInfo.id)
-      .single();
-
-    if (data) {
-      setStoreName(data.store_name || '');
-      setNotificationEmail(data.notification_email || '');
-      setSupportEmail(data.support_email || '');
-      setLogoUrl(data.logo_url || '');
-      setPrimaryColor(data.primary_color || '#000000');
-      setReturnAddress(data.return_address || '');
-      setReturnPolicy(data.return_policy || '');
+    if (!id) {
+      console.error('MERCHANT RESULT:', result);
+      return '';
     }
 
-    setLoading(false);
-  } catch (e) {
-    console.error(e);
-  }
-};
-  loadSettings();
-}, []);
+    return id;
+  };
 
-const saveSettings = async () => {
-  if (!merchantId) {
-    alert('Mağaza bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.');
-    return;
-  }
+  const loadSettings = async () => {
+    try {
+      const id = await getMerchantId();
 
-  const { error } = await supabase
-    .from('store_settings')
-    .upsert(
-      {
-        merchant_id: merchantId,
-        store_name: storeName,
-        notification_email: notificationEmail,
-        support_email: supportEmail,
-        logo_url: logoUrl,
-        primary_color: primaryColor,
-        return_address: returnAddress,
-        return_policy: returnPolicy,
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: 'merchant_id',
+      if (!id) {
+        setLoading(false);
+        return;
       }
+
+      setMerchantId(id);
+
+      const { data } = await supabase
+        .from('store_settings')
+        .select('*')
+        .eq('merchant_id', id)
+        .maybeSingle();
+
+      if (data) {
+        setStoreName(data.store_name || '');
+        setNotificationEmail(data.notification_email || '');
+        setSupportEmail(data.support_email || '');
+        setLogoUrl(data.logo_url || '');
+        setPrimaryColor(data.primary_color || '#000000');
+        setReturnAddress(data.return_address || '');
+        setReturnPolicy(data.return_policy || '');
+      }
+
+      setLoading(false);
+    } catch (e) {
+      console.error(e);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const saveSettings = async () => {
+    setSaving(true);
+
+    const id = merchantId || (await getMerchantId());
+
+    if (!id) {
+      setSaving(false);
+      alert('Mağaza bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('store_settings')
+      .upsert(
+        {
+          merchant_id: id,
+          store_name: storeName,
+          notification_email: notificationEmail,
+          support_email: supportEmail,
+          logo_url: logoUrl,
+          primary_color: primaryColor,
+          return_address: returnAddress,
+          return_policy: returnPolicy,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'merchant_id',
+        }
+      );
+
+    setSaving(false);
+
+    if (error) {
+      console.error(error);
+      alert(JSON.stringify(error, null, 2));
+      return;
+    }
+
+    setMerchantId(id);
+    alert('Ayarlar kaydedildi.');
+  };
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#f4f5f7] p-8">
+        <p>Ayarlar yükleniyor...</p>
+      </main>
     );
-
-  if (error) {
-    console.error(error);
-    alert(JSON.stringify(error, null, 2));
-    return;
   }
-
-  alert('Ayarlar kaydedildi.');
-};
 
   return (
     <main className="min-h-screen bg-[#f4f5f7] p-8">
       <div className="mx-auto max-w-4xl">
-
         <h1 className="text-4xl font-bold tracking-[-0.05em]">
           Ayarlar
         </h1>
@@ -103,7 +138,6 @@ const saveSettings = async () => {
         </p>
 
         <div className="space-y-6">
-
           <input
             value={storeName}
             onChange={(e) => setStoreName(e.target.value)}
@@ -162,14 +196,13 @@ const saveSettings = async () => {
           />
 
           <button
-  onClick={saveSettings}
-  className="w-full rounded-2xl bg-black py-4 font-bold text-white"
->
-  Ayarları Kaydet
-</button>
-
+            onClick={saveSettings}
+            disabled={saving}
+            className="w-full rounded-2xl bg-black py-4 font-bold text-white disabled:opacity-50"
+          >
+            {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
+          </button>
         </div>
-
       </div>
     </main>
   );
