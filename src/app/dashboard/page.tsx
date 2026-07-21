@@ -94,12 +94,13 @@ console.log("MERCHANT:", result);
 
     if (!result.success) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("store_settings")
       .select("*")
       .eq("merchant_id", result.data.merchantInfo.id)
       .maybeSingle();
 console.log("SETTINGS:", data);
+console.log("SETTINGS ERROR:", error);
     if (data) {
       setSettings(data);
     }
