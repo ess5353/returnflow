@@ -90,6 +90,7 @@ const fetchSettings = async () => {
     });
 
     const result = await response.json();
+console.log("MERCHANT:", result);
 
     if (!result.success) return;
 
@@ -98,7 +99,7 @@ const fetchSettings = async () => {
       .select("*")
       .eq("merchant_id", result.data.merchantInfo.id)
       .maybeSingle();
-
+console.log("SETTINGS:", data);
     if (data) {
       setSettings(data);
     }
