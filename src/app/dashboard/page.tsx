@@ -93,11 +93,13 @@ const fetchSettings = async () => {
 console.log("MERCHANT:", result);
 
     if (!result.success) return;
+console.log("BEFORE SUPABASE");
 
     const { data, error } = await supabase
       .from("store_settings")
       .select("*")
       .eq("merchant_id", result.data.merchantInfo.id)
+     
       .maybeSingle();
 console.log("SETTINGS:", data);
 console.log("SETTINGS ERROR:", error);
