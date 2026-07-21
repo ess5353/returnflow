@@ -97,10 +97,15 @@ if (logoFile) {
       upsert: true,
     });
 
-  if (uploadError) {
-    alert('Logo yüklenemedi');
-    return;
-  }
+ if (uploadError) {
+  console.error("UPLOAD ERROR:", uploadError);
+
+  alert(
+    `Logo yüklenemedi:\n${uploadError.message}`
+  );
+
+  return;
+}
 
   const { data } = supabase.storage
     .from('store-assets')
