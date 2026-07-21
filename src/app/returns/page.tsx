@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
 
 export default function ReturnsPage() {
+  
   const [step, setStep] = useState<'search' | 'order' | 'reason' | 'success'>('search');
   const [reason, setReason] = useState('');
   const [description, setDescription] = useState('');
@@ -145,8 +146,7 @@ const loadSettings = async () => {
   const { data } = await supabase
     .from('store_settings')
     .select('*')
-    .eq('merchant_id', result.merchant.id)
-    .single();
+.eq('merchant_id', result.data.merchantInfo.id)    .maybeSingle();
 
   if (data) {
     setSettings(data);
@@ -213,12 +213,30 @@ className="text-white p-8 md:p-12 relative overflow-hidden"
               <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gradient-to-br from-blue-300 to-indigo-500 opacity-40" />
 
               <div className="relative z-10">
-               <div className="inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-bold tracking-widest mb-8">
-  {settings?.store_name || 'PELYXCOMMERCE'}
+        <div className="mb-8 flex items-center gap-4">
+
+  {settings?.logo_url && (
+    <img
+      src={settings.logo_url}
+      alt="Logo"
+      className="h-14 w-14 rounded-2xl bg-white object-contain p-2"
+    />
+  )}
+
+  <div>
+    <div className="text-xs font-bold tracking-[0.25em] text-white/70">
+      RETURN PORTAL
+    </div>
+
+    <div className="text-xl font-bold">
+      {settings?.store_name || 'PELYXCOMMERCE'}
+    </div>
+  </div>
+
 </div>
 
                <h1 className="text-4xl md:text-6xl font-bold tracking-[-0.07em] leading-none">
-  {settings?.store_name || 'İade Merkezi'}
+  İade Merkezi
 </h1>
 
                 <p className="text-white/60 mt-5 text-lg leading-8">

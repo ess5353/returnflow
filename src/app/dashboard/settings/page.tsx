@@ -7,7 +7,7 @@ import { TokenHelpers } from '@/helpers/token-helpers';
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
+const [logoFile, setLogoFile] = useState<File | null>(null);
   const [merchantId, setMerchantId] = useState('');
   const [storeName, setStoreName] = useState('');
   const [notificationEmail, setNotificationEmail] = useState('');
@@ -86,16 +86,38 @@ export default function SettingsPage() {
       alert('Mağaza bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.');
       return;
     }
+let uploadedLogo = logoUrl;
 
+if (logoFile) {
+  const fileName = `${merchantId}-${Date.now()}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('store-assets')
+    .upload(fileName, logoFile, {
+      upsert: true,
+    });
+
+  if (uploadError) {
+    alert('Logo yüklenemedi');
+    return;
+  }
+
+  const { data } = supabase.storage
+    .from('store-assets')
+    .getPublicUrl(fileName);
+
+  uploadedLogo = data.publicUrl;
+}
     const { error } = await supabase
       .from('store_settings')
+      
       .upsert(
         {
           merchant_id: id,
           store_name: storeName,
           notification_email: notificationEmail,
           support_email: supportEmail,
-          logo_url: logoUrl,
+          logo_url: uploadedLogo,
           primary_color: primaryColor,
           return_address: returnAddress,
           return_policy: returnPolicy,
@@ -159,12 +181,33 @@ export default function SettingsPage() {
             className="w-full rounded-2xl border p-4"
           />
 
-          <input
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="Logo URL"
-            className="w-full rounded-2xl border p-4"
-          />
+          <div>
+  <label className="mb-2 block font-semibold">
+    Mağaza Logosu
+  </label>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) =>
+      setLogoFile(e.target.files?.[0] || null)
+    }
+    className="w-full rounded-2xl border p-4"
+  />
+  {(logoFile || logoUrl) && (
+  <div className="mt-4">
+    <img
+      src={
+        logoFile
+          ? URL.createObjectURL(logoFile)
+          : logoUrl
+      }
+      alt="Logo"
+      className="h-24 w-24 rounded-2xl border object-contain bg-white"
+    />
+  </div>
+)}
+</div>
 
           <div>
             <label className="mb-2 block font-semibold">

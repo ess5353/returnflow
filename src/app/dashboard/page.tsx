@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [dateFilter, setDateFilter] = useState('Tümü');
-
+const [settings, setSettings] = useState<any>(null);
 
 
   const fetchRequests = async () => {
@@ -79,10 +79,37 @@ const fetchOrders = async () => {
     setOrders(data.orders);
   }
 };
+const fetchSettings = async () => {
+  try {
+    const token = await TokenHelpers.getTokenForIframeApp();
 
+    const response = await fetch("/api/ikas/get-merchant", {
+      headers: {
+        Authorization: `JWT ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!result.success) return;
+
+    const { data } = await supabase
+      .from("store_settings")
+      .select("*")
+      .eq("merchant_id", result.data.merchantInfo.id)
+      .maybeSingle();
+
+    if (data) {
+      setSettings(data);
+    }
+  } catch (error) {
+    console.error("Settings yüklenemedi:", error);
+  }
+};
   useEffect(() => {
   fetchRequests();
   fetchOrders();
+  fetchSettings();
 }, []);
 
   const updateStatus = async (status: string) => {
@@ -186,13 +213,31 @@ const topReason =
       <section className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-5">
           <div>
-            <div className="mb-4 inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold tracking-[0.24em] text-white">
-              PELYXCOMMERCE
-            </div>
+            <div className="mb-8 flex items-center gap-4">
+
+  {settings?.logo_url && (
+    <img
+      src={settings.logo_url}
+      alt="Store Logo"
+      className="h-14 w-14 rounded-2xl border bg-white object-contain p-2"
+    />
+  )}
+
+  <div>
+    <div className="text-xs font-bold tracking-[0.3em] text-gray-500 uppercase">
+      ReturnFlow
+    </div>
+
+    <h1 className="text-3xl font-bold">
+      {settings?.store_name || "PELYXCOMMERCE"}
+    </h1>
+  </div>
+
+</div>
 
             <h1 className="text-4xl md:text-6xl font-bold tracking-[-0.07em]">
-              ReturnFlow
-            </h1>
+  İade Yönetim Paneli
+</h1>
 
             <p className="mt-3 max-w-xl text-gray-500 text-base md:text-lg">
               İade taleplerini tek panelden yönet, onayla ve süreci müşteriye daha profesyonel yaşat.
@@ -209,9 +254,10 @@ const topReason =
 
   <button
     onClick={() => {
-      fetchRequests();
-      fetchOrders();
-    }}
+  fetchRequests();
+  fetchOrders();
+  fetchSettings();
+}}
     className="rounded-2xl bg-black px-6 py-4 font-bold text-white shadow-xl"
   >
     Yenile
@@ -246,8 +292,7 @@ const topReason =
 
               <div className="mt-6 flex flex-col md:flex-row gap-3 rounded-2xl bg-white/10 p-4 border border-white/10">
                 <span className="flex-1 break-all text-white/80">
-                  https://returnflow.pelyxcommerce.com/pelyxcommerce
-                </span>
+https://returnflow-git-main-ess7.vercel.app/returns                </span>
 
                 <button
   onClick={() => {
