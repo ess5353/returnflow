@@ -80,6 +80,7 @@ const fetchOrders = async () => {
   }
 };
 const fetchSettings = async () => {
+    console.log("FETCH SETTINGS START");
   try {
     const token = await TokenHelpers.getTokenForIframeApp();
 
