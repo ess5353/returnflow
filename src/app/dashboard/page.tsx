@@ -99,9 +99,7 @@ console.log("BEFORE SUPABASE");
     const { data, error } = await supabase
       .from("store_settings")
       .select("*")
-      .eq("merchant_id", result.data.merchantInfo.id)
-     
-      .maybeSingle();
+      console.log("ALL SETTINGS:", data);
 console.log("SETTINGS:", data);
 console.log("SETTINGS ERROR:", error);
     if (data) {
