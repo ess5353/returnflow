@@ -49,7 +49,6 @@ export default function DashboardPage() {
   const [adminNote, setAdminNote] = useState('');
   const [dateFilter, setDateFilter] = useState('Tümü');
   const { settings, loadSettings: fetchSettings } = useStoreSettings();
-  console.log('[DashboardPage] STEP 9: settings in render =', JSON.stringify(settings));
 
   const fetchRequests = async () => {
     const { data, error } = await supabase

@@ -19,22 +19,14 @@ export default function ReturnsPage() {
   const [settings, setSettings] = useState<PublicStoreSettings | null>(null);
 
   useEffect(() => {
-    console.log('[returns] STEP 1: loading public store settings');
     fetch('/api/store-settings')
-      .then((res) => {
-        console.log('[returns] STEP 2: HTTP status =', res.status);
-        return res.json();
-      })
+      .then((res) => res.json())
       .then((result) => {
-        console.log('[returns] STEP 3: result =', JSON.stringify(result));
         if (result.data) {
-          console.log('[returns] STEP 4: setSettings called with', JSON.stringify(result.data));
           setSettings(result.data);
-        } else {
-          console.log('[returns] STEP 4 FAIL: result.data is null');
         }
       })
-      .catch((err) => console.error('[returns] fetch error:', err));
+      .catch((err) => console.error('Store settings yüklenemedi:', err));
   }, []);
 
   const createReturnRequest = async () => {

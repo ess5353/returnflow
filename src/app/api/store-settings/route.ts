@@ -13,11 +13,8 @@ export type PublicStoreSettings = {
 
 export async function GET() {
   try {
-    console.log('[store-settings] STEP A: handler called');
-
     const tokens = await AuthTokenManager.list();
     const authToken = tokens.find((t) => !t.deleted);
-    console.log('[store-settings] STEP B: authToken found =', !!authToken);
 
     if (!authToken) {
       return NextResponse.json({ error: 'No auth token' }, { status: 404 });
@@ -26,7 +23,6 @@ export async function GET() {
     const ikas = getIkas(authToken);
     const merchantResponse = await ikas.queries.getMerchant();
     const merchantId = merchantResponse.data?.getMerchant?.id;
-    console.log('[store-settings] STEP C: merchantId =', merchantId);
 
     if (!merchantId) {
       return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
@@ -37,11 +33,15 @@ export async function GET() {
       .select('store_name, logo_url, primary_color, support_email, return_policy')
       .eq('merchant_id', merchantId)
       .maybeSingle();
-    console.log('[store-settings] STEP D: supabase data =', JSON.stringify(data), '| error =', JSON.stringify(error));
+
+    if (error) {
+      console.error('store_settings sorgusu başarısız:', error);
+      return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: data ?? null });
   } catch (err) {
-    console.error('[store-settings] ERROR:', err);
+    console.error('store-settings hatası:', err);
     return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 });
   }
 }
