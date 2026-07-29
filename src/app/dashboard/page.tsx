@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
+import { AppBridgeHelper } from '@ikas/app-helpers';
+import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import Link from 'next/link';
 
 type ReturnRequest = {
@@ -10,9 +12,7 @@ type ReturnRequest = {
   order_id: string;
   rf_number: string;
   customer_name: string;
-
   product: string;
-
   products:
     | {
         name: string;
@@ -20,7 +20,6 @@ type ReturnRequest = {
         price: number;
       }[]
     | null;
-
   reason: string;
   description: string | null;
   admin_note: string | null;
@@ -31,19 +30,26 @@ type ReturnRequest = {
   customer_email: string | null;
 };
 
-
+type IkasOrder = {
+  id: string;
+  orderNumber: string | number;
+  status: string;
+  customerName: string;
+  totalPrice: number;
+  items: { name: string; sku?: string; quantity: number; price: number }[];
+};
 
 export default function DashboardPage() {
   const [requests, setRequests] = useState<ReturnRequest[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<IkasOrder[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('Tümü');
   const [search, setSearch] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [dateFilter, setDateFilter] = useState('Tümü');
-const [settings, setSettings] = useState<any>(null);
-
+  const { settings, loadSettings: fetchSettings } = useStoreSettings();
+  console.log('[DashboardPage] STEP 9: settings in render =', JSON.stringify(settings));
 
   const fetchRequests = async () => {
     const { data, error } = await supabase
@@ -62,154 +68,102 @@ const [settings, setSettings] = useState<any>(null);
     setLoading(false);
   };
 
-const fetchOrders = async () => {
-  const token = await TokenHelpers.getTokenForIframeApp();
-
-  const response = await fetch('/api/ikas/orders', {
-    headers: {
-      Authorization: `JWT ${token}`,
-    },
-  });
-
-  const data = await response.json();
-
-  console.log('IKAS ORDERS:', data);
-
-  if (data.success) {
-    setOrders(data.orders);
-  }
-};
-const fetchSettings = async () => {
-    console.log("FETCH SETTINGS START");
-  try {
+  const fetchOrders = async () => {
     const token = await TokenHelpers.getTokenForIframeApp();
 
-    const response = await fetch("/api/ikas/get-merchant", {
+    const response = await fetch('/api/ikas/orders', {
       headers: {
         Authorization: `JWT ${token}`,
       },
     });
 
-    const result = await response.json();
-console.log("MERCHANT:", result);
+    const data = await response.json();
 
-    if (!result.success) return;
-console.log("BEFORE SUPABASE");
-
-    const { data, error } = await supabase
-      .from("store_settings")
-      .select("*")
-      console.log("ALL SETTINGS:", data);
-console.log("SETTINGS:", data);
-console.log("SETTINGS ERROR:", error);
-    if (data) {
-      setSettings(data);
+    if (data.success) {
+      setOrders(data.orders);
     }
-  } catch (error) {
-    console.error("Settings yüklenemedi:", error);
-  }
-};
+  };
+
   useEffect(() => {
-  fetchRequests();
-  fetchOrders();
-  fetchSettings();
-}, []);
+    AppBridgeHelper.closeLoader();
+  }, []);
+
+  useEffect(() => {
+    fetchRequests();
+    fetchOrders();
+    fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateStatus = async (status: string) => {
-  if (!selectedRequest) return;
+    if (!selectedRequest) return;
 
-  const { error } = await supabase
-    .from('return_requests')
-    .update({ status })
-    .eq('id', selectedRequest.id);
+    const { error } = await supabase.from('return_requests').update({ status }).eq('id', selectedRequest.id);
 
-  if (error) {
-    console.error(error);
-    alert('Durum güncellenemedi');
-    return;
-  }
+    if (error) {
+      console.error(error);
+      alert('Durum güncellenemedi');
+      return;
+    }
 
-  await fetchRequests();
+    await fetchRequests();
 
-  setSelectedRequest({
-    ...selectedRequest,
-    status,
+    setSelectedRequest({
+      ...selectedRequest,
+      status,
+    });
+  };
+
+  const filteredRequests = requests.filter((r) => {
+    const matchesFilter = filter === 'Tümü' || r.status === filter;
+
+    const matchesSearch =
+      (r.customer_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (r.customer_email || '').toLowerCase().includes(search.toLowerCase()) ||
+      (r.order_id || '').toLowerCase().includes(search.toLowerCase()) ||
+      (r.rf_number || '').toLowerCase().includes(search.toLowerCase());
+
+    const createdAt = new Date(r.created_at);
+    const now = new Date();
+
+    let matchesDate = true;
+
+    if (dateFilter === 'Bugün') {
+      matchesDate = createdAt.toDateString() === now.toDateString();
+    }
+
+    if (dateFilter === 'Son 7 Gün') {
+      matchesDate = createdAt >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    if (dateFilter === 'Son 30 Gün') {
+      matchesDate = createdAt >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    if (dateFilter === 'Bu Ay') {
+      matchesDate = createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+    }
+
+    return matchesFilter && matchesSearch && matchesDate;
   });
-};
 
-const filteredRequests = requests.filter((r) => {
-  const matchesFilter =
-    filter === 'Tümü' || r.status === filter;
-
-  const matchesSearch =
-  (r.customer_name || '')
-    .toLowerCase()
-    .includes(search.toLowerCase()) ||
-
-  (r.customer_email || '')
-    .toLowerCase()
-    .includes(search.toLowerCase()) ||
-
-  (r.order_id || '')
-    .toLowerCase()
-    .includes(search.toLowerCase()) ||
-
-  (r.rf_number || '')
-    .toLowerCase()
-    .includes(search.toLowerCase());
-
-  const createdAt = new Date(r.created_at);
-  const now = new Date();
-
-  let matchesDate = true;
-
-  if (dateFilter === 'Bugün') {
-    matchesDate =
-      createdAt.toDateString() === now.toDateString();
-  }
-
-  if (dateFilter === 'Son 7 Gün') {
-    matchesDate =
-      createdAt >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  }
-
-  if (dateFilter === 'Son 30 Gün') {
-    matchesDate =
-      createdAt >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  }
-
-  if (dateFilter === 'Bu Ay') {
-    matchesDate =
-      createdAt.getMonth() === now.getMonth() &&
-      createdAt.getFullYear() === now.getFullYear();
-  }
-
-  return matchesFilter && matchesSearch && matchesDate;
-});
-
-const statsRequests = filteredRequests;
-const totalReturnAmount = statsRequests.reduce(
-  (total, item) => total + Number(item.amount || 0),
-  0
-);
+  const statsRequests = filteredRequests;
+  const totalReturnAmount = statsRequests.reduce((total, item) => total + Number(item.amount || 0), 0);
   const selected = selectedRequest;
 
-const reasonCounts = statsRequests.reduce((acc: any, item) => {
-  acc[item.reason] = (acc[item.reason] || 0) + 1;
-  return acc;
-}, {});
+  const reasonCounts = statsRequests.reduce(
+    (acc: Record<string, number>, item) => {
+      acc[item.reason] = (acc[item.reason] || 0) + 1;
+      return acc;
+    },
+    {},
+  );
 
-const topReason =
-  Object.entries(reasonCounts).sort(
-    (a: any, b: any) => b[1] - a[1]
-  )[0];
+  const topReason = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0];
 
   const reasonStats = Object.entries(reasonCounts)
-  .sort((a: any, b: any) => b[1] - a[1])
-  .slice(0, 5);
-
-
-
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
 
   return (
     <main className="min-h-screen bg-[#f4f5f7] p-4 md:p-8 text-[#111]">
@@ -217,71 +171,58 @@ const topReason =
         <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-5">
           <div>
             <div className="mb-8 flex items-center gap-4">
+              {settings?.logo_url && (
+                <img
+                  src={settings.logo_url}
+                  alt="Store Logo"
+                  className="h-14 w-14 rounded-2xl border bg-white object-contain p-2"
+                />
+              )}
 
-  {settings?.logo_url && (
-    <img
-      src={settings.logo_url}
-      alt="Store Logo"
-      className="h-14 w-14 rounded-2xl border bg-white object-contain p-2"
-    />
-  )}
+              <div>
+                <div className="text-xs font-bold tracking-[0.3em] text-gray-500 uppercase">ReturnFlow</div>
 
-  <div>
-    <div className="text-xs font-bold tracking-[0.3em] text-gray-500 uppercase">
-      ReturnFlow
-    </div>
+                <h1 className="text-3xl font-bold">{settings?.store_name || 'PELYXCOMMERCE'}</h1>
+              </div>
+            </div>
 
-    <h1 className="text-3xl font-bold">
-      {settings?.store_name || "PELYXCOMMERCE"}
-    </h1>
-  </div>
-
-</div>
-
-            <h1 className="text-4xl md:text-6xl font-bold tracking-[-0.07em]">
-  İade Yönetim Paneli
-</h1>
+            <h1 className="text-4xl md:text-6xl font-bold tracking-[-0.07em]">İade Yönetim Paneli</h1>
 
             <p className="mt-3 max-w-xl text-gray-500 text-base md:text-lg">
               İade taleplerini tek panelden yönet, onayla ve süreci müşteriye daha profesyonel yaşat.
             </p>
           </div>
 
-   <div className="flex gap-3">
-  <Link
-    href="/dashboard/settings"
-    className="rounded-2xl border border-gray-200 bg-white px-6 py-4 font-bold"
-  >
-    ⚙️ Ayarlar
-  </Link>
+          <div className="flex gap-3">
+            <Link href="/dashboard/settings" className="rounded-2xl border border-gray-200 bg-white px-6 py-4 font-bold">
+              ⚙️ Ayarlar
+            </Link>
 
-  <button
-    onClick={() => {
-  fetchRequests();
-  fetchOrders();
-  fetchSettings();
-}}
-    className="rounded-2xl bg-black px-6 py-4 font-bold text-white shadow-xl"
-  >
-    Yenile
-  </button>
-</div>
+            <button
+              onClick={() => {
+                fetchRequests();
+                fetchOrders();
+                fetchSettings();
+              }}
+              className="rounded-2xl bg-black px-6 py-4 font-bold text-white shadow-xl"
+            >
+              Yenile
+            </button>
+          </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-  {['Bugün', 'Son 7 Gün', 'Son 30 Gün', 'Bu Ay', 'Tümü'].map((item) => (
-    <button
-      key={item}
-      onClick={() => setDateFilter(item)}
-      className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-        dateFilter === item
-          ? 'bg-black text-white'
-          : 'bg-gray-100 text-black'
-      }`}
-    >
-      {item}
-    </button>
-  ))}
-</div>
+            {['Bugün', 'Son 7 Gün', 'Son 30 Gün', 'Bu Ay', 'Tümü'].map((item) => (
+              <button
+                key={item}
+                onClick={() => setDateFilter(item)}
+                className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                  dateFilter === item ? 'bg-black text-white' : 'bg-gray-100 text-black'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.9fr] gap-5">
@@ -290,32 +231,28 @@ const topReason =
               <p className="text-white/50 font-semibold">İade Portal Linki</p>
 
               <h2 className="mt-3 text-2xl md:text-3xl font-bold tracking-[-0.05em]">
-                Bu linki mağazanızdaki “İade & Değişim” alanına ekleyin.
+                Bu linki mağazanızdaki &ldquo;İade &amp; Değişim&rdquo; alanına ekleyin.
               </h2>
 
               <div className="mt-6 flex flex-col md:flex-row gap-3 rounded-2xl bg-white/10 p-4 border border-white/10">
-                <span className="flex-1 break-all text-white/80">
-https://returnflow-git-main-ess7.vercel.app/returns                </span>
+                <span className="flex-1 break-all text-white/80">https://returnflow-git-main-ess7.vercel.app/returns</span>
 
                 <button
-  onClick={() => {
-    navigator.clipboard.writeText(
-      'https://returnflow-git-main-ess7.vercel.app/returns'
-    );
-    alert('Portal linki kopyalandı');
-  }}
-  className="rounded-xl bg-white px-5 py-3 font-extrabold text-black"
->
-  Kopyala
-</button>
+                  onClick={() => {
+                    navigator.clipboard.writeText('https://returnflow-git-main-ess7.vercel.app/returns');
+                    alert('Portal linki kopyalandı');
+                  }}
+                  className="rounded-xl bg-white px-5 py-3 font-extrabold text-black"
+                >
+                  Kopyala
+                </button>
               </div>
             </div>
 
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
                 <p className="text-gray-500 font-semibold">Toplam İade</p>
-                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-                  {statsRequests.length}
-                </h3>
+                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">{statsRequests.length}</h3>
               </div>
 
               <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
@@ -325,169 +262,125 @@ https://returnflow-git-main-ess7.vercel.app/returns                </span>
                 </h3>
               </div>
 
-        <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-  <p className="text-gray-500 font-semibold">Onaylanan</p>
+              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
+                <p className="text-gray-500 font-semibold">Onaylanan</p>
+                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
+                  {statsRequests.filter((r) => r.status === 'Onaylandı').length}
+                </h3>
+              </div>
 
-  <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-   {statsRequests.filter((r) => r.status === 'Onaylandı').length}
-  </h3>
-</div>
+              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
+                <p className="text-gray-500 font-semibold">Reddedilen</p>
+                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
+                  {statsRequests.filter((r) => r.status === 'Reddedildi').length}
+                </h3>
+              </div>
 
-<div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-  <p className="text-gray-500 font-semibold">Reddedilen</p>
+              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
+                <p className="text-gray-500 font-semibold">Toplam İade Tutarı</p>
+                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">₺{totalReturnAmount.toLocaleString('tr-TR')}</h3>
+              </div>
 
-
-
-  <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-   {statsRequests.filter((r) => r.status === 'Reddedildi').length}
-  </h3>
-</div>
-
-<div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-  <p className="text-gray-500 font-semibold">
-    Toplam İade Tutarı
-  </p>
-
-  <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-    ₺{totalReturnAmount.toLocaleString('tr-TR')}
-  </h3>
-</div>
-
-
-<div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-  <p className="text-gray-500 font-semibold">
-    En Çok İade Sebebi
-  </p>
-
-  <h3 className="mt-3 text-xl font-bold">
-    {topReason ? topReason[0] : '-'}
-  </h3>
-
-  <p className="mt-2 text-sm text-gray-500">
-    {topReason ? `${topReason[1]} kez` : ''}
-  </p>
-</div>
+              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
+                <p className="text-gray-500 font-semibold">En Çok İade Sebebi</p>
+                <h3 className="mt-3 text-xl font-bold">{topReason ? topReason[0] : '-'}</h3>
+                <p className="mt-2 text-sm text-gray-500">{topReason ? `${topReason[1]} kez` : ''}</p>
+              </div>
             </div>
 
-<div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
-  <h2 className="text-2xl font-bold tracking-[-0.04em]">
-    İade Sebebi Analizi
-  </h2>
+            <div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
+              <h2 className="text-2xl font-bold tracking-[-0.04em]">İade Sebebi Analizi</h2>
 
-  <p className="mt-1 text-gray-500">
-    En çok gelen iade sebeplerini gör.
-  </p>
+              <p className="mt-1 text-gray-500">En çok gelen iade sebeplerini gör.</p>
 
-  <div className="mt-6 space-y-4">
-    {reasonStats.map(([reason, count]: any) => (
-      <div key={reason}>
-        <div className="mb-2 flex justify-between text-sm font-bold">
-          <span>{reason}</span>
-          <span>{count} kez</span>
-        </div>
+              <div className="mt-6 space-y-4">
+                {reasonStats.map(([reason, count]) => (
+                  <div key={reason}>
+                    <div className="mb-2 flex justify-between text-sm font-bold">
+                      <span>{reason}</span>
+                      <span>{count} kez</span>
+                    </div>
 
-        <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-black"
-            style={{
-              width: `${
-  statsRequests.length
-    ? Math.min((Number(count) / statsRequests.length) * 100, 100)
-    : 0
-}%`,
-            }}
-          />
-        </div>
-      </div>
-    ))}
-  </div>
-</div>
+                    <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-black"
+                        style={{
+                          width: `${statsRequests.length ? Math.min((count / statsRequests.length) * 100, 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-<div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
-  <h2 className="text-2xl md:text-3xl font-bold tracking-[-0.05em]">
-    İkas Son Siparişler
-  </h2>
+            <div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
+              <h2 className="text-2xl md:text-3xl font-bold tracking-[-0.05em]">İkas Son Siparişler</h2>
 
-  <p className="mt-1 text-gray-500">
-    Mağazanızdan gelen son siparişler.
-  </p>
+              <p className="mt-1 text-gray-500">Mağazanızdan gelen son siparişler.</p>
 
-  <div className="mt-6 space-y-3">
-    {orders.map((order) => (
-      <div
-        key={order.id}
-        className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 rounded-3xl border border-gray-100 bg-[#fafafa] p-5 md:items-center"
-      >
-        <div>
-          <p className="text-sm text-gray-400">Sipariş</p>
-          <strong>#{order.orderNumber}</strong>
-        </div>
+              <div className="mt-6 space-y-3">
+                {orders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 rounded-3xl border border-gray-100 bg-[#fafafa] p-5 md:items-center"
+                  >
+                    <div>
+                      <p className="text-sm text-gray-400">Sipariş</p>
+                      <strong>#{order.orderNumber}</strong>
+                    </div>
 
-        <div>
-          <p className="text-sm text-gray-400">Müşteri</p>
-          <strong>{order.customerName}</strong>
-        </div>
+                    <div>
+                      <p className="text-sm text-gray-400">Müşteri</p>
+                      <strong>{order.customerName}</strong>
+                    </div>
 
-        <div>
-          <p className="text-sm text-gray-400">Ürün</p>
-          <strong>{order.items?.[0]?.name || '-'}</strong>
-        </div>
+                    <div>
+                      <p className="text-sm text-gray-400">Ürün</p>
+                      <strong>{order.items?.[0]?.name || '-'}</strong>
+                    </div>
 
-        <div className="text-left md:text-right">
-          <p className="font-bold">
-            ₺{order.totalPrice}
-            
-          </p>
-          <span className="text-xs font-bold text-gray-500">
-            {order.status}
-          </span>
-        </div>
-      </div>
-    ))}
-  </div>
-</div>
+                    <div className="text-left md:text-right">
+                      <p className="font-bold">₺{order.totalPrice}</p>
+                      <span className="text-xs font-bold text-gray-500">{order.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
               <div className="mb-6">
-                <h2 className="text-2xl md:text-3xl font-bold tracking-[-0.05em]">
-                  İade Talepleri
-                </h2>
-                <p className="mt-1 text-gray-500">
-                  Müşterilerden gelen gerçek iade kayıtları.
-                </p>
+                <h2 className="text-2xl md:text-3xl font-bold tracking-[-0.05em]">İade Talepleri</h2>
+                <p className="mt-1 text-gray-500">Müşterilerden gelen gerçek iade kayıtları.</p>
 
-<div className="mt-4 flex flex-wrap gap-2">
-  <div className="mt-4">
-  <input
-    type="text"
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-black"
-  />
-</div>
-  {['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'].map((item) => (
-    <button
-      key={item}
-      onClick={() => setFilter(item)}
-      className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-        filter === item
-          ? 'bg-black text-white'
-          : 'bg-gray-100 text-black'
-      }`}
-    >
-      {item}
-    </button>
-  ))}
-</div>
-
-
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4">
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-black"
+                    />
+                  </div>
+                  {['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'].map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setFilter(item)}
+                      className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                        filter === item ? 'bg-black text-white' : 'bg-gray-100 text-black'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {loading && <p className="text-gray-500">Yükleniyor...</p>}
 
-              {!loading && requests.length === 0 && (
-                <p className="text-gray-500">Henüz iade talebi yok.</p>
-              )}
+              {!loading && requests.length === 0 && <p className="text-gray-500">Henüz iade talebi yok.</p>}
 
               <div className="space-y-3">
                 {filteredRequests.map((request) => {
@@ -497,30 +390,22 @@ placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-
                     <div
                       key={request.id}
                       className={`grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr_auto] gap-4 rounded-3xl border p-5 md:items-center transition ${
-                        isSelected
-                          ? 'border-black bg-white shadow-md'
-                          : 'border-gray-100 bg-[#fafafa]'
+                        isSelected ? 'border-black bg-white shadow-md' : 'border-gray-100 bg-[#fafafa]'
                       }`}
                     >
                       <div>
                         <div className="flex flex-wrap gap-2 items-center">
-<strong>{request.rf_number}</strong>                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-
-    request.status === 'Onaylandı'
-
-      ? 'bg-green-100 text-green-700'
-
-      : request.status === 'Reddedildi'
-
-      ? 'bg-red-100 text-red-700'
-
-      : 'bg-yellow-100 text-yellow-700'
-
-  }`}
-
->
-
-  {request.status}
+                          <strong>{request.rf_number}</strong>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-bold ${
+                              request.status === 'Onaylandı'
+                                ? 'bg-green-100 text-green-700'
+                                : request.status === 'Reddedildi'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}
+                          >
+                            {request.status}
                           </span>
                         </div>
                         <p className="mt-2 text-gray-500">
@@ -529,9 +414,7 @@ placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-
 
                         <p className="mt-1 font-semibold">{request.product}</p>
                       </div>
-<p className="mt-1 text-sm text-gray-400">
-  {request.customer_email || 'E-posta yok'}
-</p>
+                      <p className="mt-1 text-sm text-gray-400">{request.customer_email || 'E-posta yok'}</p>
                       <div>
                         <p className="text-sm text-gray-400">Sebep</p>
                         <strong>{request.reason}</strong>
@@ -543,10 +426,10 @@ placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-
                       </div>
 
                       <button
-                       onClick={() => {
-  setSelectedRequest(request);
-  setAdminNote(request.admin_note || '');
-}}
+                        onClick={() => {
+                          setSelectedRequest(request);
+                          setAdminNote(request.admin_note || '');
+                        }}
                         className="rounded-2xl bg-black px-5 py-3 font-bold text-white"
                       >
                         İncele
@@ -565,8 +448,7 @@ placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-
               <p className="mt-4 text-gray-500">Henüz talep yok.</p>
             ) : (
               <>
-                <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em]">
-  {selected.rf_number}                </h2>
+                <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em]">{selected.rf_number}</h2>
 
                 <div className="mt-6 space-y-5">
                   <div>
@@ -579,50 +461,43 @@ placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-
                     <strong>{selected.customer_name}</strong>
                   </div>
 
-<div>
-  <p className="text-sm text-gray-400">E-posta</p>
-  <strong>{selected.customer_email || '-'}</strong>
-</div>
+                  <div>
+                    <p className="text-sm text-gray-400">E-posta</p>
+                    <strong>{selected.customer_email || '-'}</strong>
+                  </div>
 
-                <div>
-  <p className="text-sm text-gray-400 mb-3">
-    İade Edilen Ürünler
-  </p>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-3">İade Edilen Ürünler</p>
 
-  {selected.products && selected.products.length > 0 ? (
-    <div className="space-y-3">
-      {selected.products.map((item, index) => (
-        <div
-          key={index}
-          className="rounded-2xl bg-[#f4f5f7] p-4"
-        >
-          <p className="font-bold">{item.name}</p>
+                    {selected.products && selected.products.length > 0 ? (
+                      <div className="space-y-3">
+                        {selected.products.map((item, index) => (
+                          <div key={index} className="rounded-2xl bg-[#f4f5f7] p-4">
+                            <p className="font-bold">{item.name}</p>
 
-          <p className="text-sm text-gray-500 mt-1">
-            {item.quantity} Adet • ₺{item.price}
-          </p>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <strong>{selected.product}</strong>
-  )}
-</div>  
+                            <p className="text-sm text-gray-500 mt-1">
+                              {item.quantity} Adet • ₺{item.price}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <strong>{selected.product}</strong>
+                    )}
+                  </div>
 
-                <div>
-  <p className="text-sm text-gray-400">İade Sebebi</p>
-  <strong>{selected.reason}</strong>
-</div>
+                  <div>
+                    <p className="text-sm text-gray-400">İade Sebebi</p>
+                    <strong>{selected.reason}</strong>
+                  </div>
 
-{selected.description && (
-  <div>
-    <p className="text-sm text-gray-400">Açıklama</p>
+                  {selected.description && (
+                    <div>
+                      <p className="text-sm text-gray-400">Açıklama</p>
 
-    <div className="mt-2 rounded-2xl bg-[#f4f5f7] p-4 text-sm leading-6">
-      {selected.description}
-    </div>
-  </div>
-)}
+                      <div className="mt-2 rounded-2xl bg-[#f4f5f7] p-4 text-sm leading-6">{selected.description}</div>
+                    </div>
+                  )}
 
                   <div>
                     <p className="text-sm text-gray-400">Tutar</p>
@@ -633,37 +508,27 @@ placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-
                     <p className="text-sm text-gray-400">Durum</p>
                     <strong>{selected.status}</strong>
                   </div>
-{selected.media_urls && selected.media_urls.length > 0 && (
-  <div>
-    <p className="text-sm text-gray-400 mb-3">Kanıt Dosyaları</p>
 
-    <div className="grid grid-cols-2 gap-3">
-      {selected.media_urls.map((url, index) => {
-        const isVideo =
-          url.includes('.mp4') ||
-          url.includes('.mov') ||
-          url.includes('.webm');
+                  {selected.media_urls && selected.media_urls.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-400 mb-3">Kanıt Dosyaları</p>
 
-        return isVideo ? (
-          <video
-            key={index}
-            controls
-            className="w-full rounded-2xl border"
-          >
-            <source src={url} />
-          </video>
-        ) : (
-          <img
-            key={index}
-            src={url}
-            alt="Return media"
-            className="w-full rounded-2xl border"
-          />
-        );
-      })}
-    </div>
-  </div>
-)}
+                      <div className="grid grid-cols-2 gap-3">
+                        {selected.media_urls.map((url, index) => {
+                          const isVideo = url.includes('.mp4') || url.includes('.mov') || url.includes('.webm');
+
+                          return isVideo ? (
+                            <video key={index} controls className="w-full rounded-2xl border">
+                              <source src={url} />
+                            </video>
+                          ) : (
+                            <img key={index} src={url} alt="Return media" className="w-full rounded-2xl border" />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="rounded-3xl bg-[#f4f5f7] p-5">
                     <p className="text-sm text-gray-500">
                       Bu alanda mağaza sahibi seçilen iade talebini inceleyip onay/red işlemi yapacak.
@@ -671,84 +536,59 @@ placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."    className="w-
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
-<div>
-  <p className="text-sm text-gray-400 mb-2">
-    Mağaza Notu
-  </p>
+                    <div>
+                      <p className="text-sm text-gray-400 mb-2">Mağaza Notu</p>
 
-  <textarea
-    value={adminNote}
-    onChange={(e) => setAdminNote(e.target.value)}
-    rows={4}
-    className="w-full rounded-2xl border border-gray-200 p-4"
-    placeholder="İade ile ilgili not bırak..."
-  />
-</div>
-
-<button
-  onClick={async () => {
-    if (!selected) return;
-
-    await supabase
-      .from('return_requests')
-      .update({
-        admin_note: adminNote,
-      })
-      .eq('id', selected.id);
-
-    await fetchRequests();
-  }}
-  className="rounded-2xl border border-gray-200 py-3 font-bold"
->
-  Notu Kaydet
-</button>
-
-                  <button
-  onClick={() => updateStatus('Onaylandı')}
-  className="rounded-2xl bg-black py-4 font-bold text-white"
->
-  Talebi Onayla
-</button>
-
-                    
+                      <textarea
+                        value={adminNote}
+                        onChange={(e) => setAdminNote(e.target.value)}
+                        rows={4}
+                        className="w-full rounded-2xl border border-gray-200 p-4"
+                        placeholder="İade ile ilgili not bırak..."
+                      />
+                    </div>
 
                     <button
-  onClick={() => updateStatus('Reddedildi')}
-  className="rounded-2xl border border-gray-200 py-4 font-bold"
->
-  Talebi Reddet
-</button>
-<button
-  onClick={async () => {
-    if (!selected) return;
+                      onClick={async () => {
+                        if (!selected) return;
 
-    console.log('SELECTED:', selected);
-    console.log('SELECTED ID:', selected.id);
+                        await supabase.from('return_requests').update({ admin_note: adminNote }).eq('id', selected.id);
 
-    const kontrol = await supabase
-      .from('return_requests')
-      .select('*')
-      .eq('id', selected.id);
+                        await fetchRequests();
+                      }}
+                      className="rounded-2xl border border-gray-200 py-3 font-bold"
+                    >
+                      Notu Kaydet
+                    </button>
 
-    console.log('KONTROL:', kontrol.data);
+                    <button onClick={() => updateStatus('Onaylandı')} className="rounded-2xl bg-black py-4 font-bold text-white">
+                      Talebi Onayla
+                    </button>
 
-    const { data, error } = await supabase
-      .from('return_requests')
-      .delete()
-      .eq('id', selected.id)
-      .select();
+                    <button onClick={() => updateStatus('Reddedildi')} className="rounded-2xl border border-gray-200 py-4 font-bold">
+                      Talebi Reddet
+                    </button>
 
-    console.log('SILINEN:', data);
-    console.log('ERROR:', error);
+                    <button
+                      onClick={async () => {
+                        if (!selected) return;
 
-    await fetchRequests();
+                        const { error } = await supabase.from('return_requests').delete().eq('id', selected.id);
 
-    setSelectedRequest(null);
-  }}
-  className="rounded-2xl bg-red-500 py-4 font-bold text-white"
->
-  Talebi Sil
-</button>                </div>
+                        if (error) {
+                          console.error(error);
+                          alert('Talep silinemedi');
+                          return;
+                        }
+
+                        await fetchRequests();
+                        setSelectedRequest(null);
+                      }}
+                      className="rounded-2xl bg-red-500 py-4 font-bold text-white"
+                    >
+                      Talebi Sil
+                    </button>
+                  </div>
                 </div>
               </>
             )}

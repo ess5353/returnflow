@@ -40,11 +40,6 @@ export async function POST(request: NextRequest) {
       `,
     });
 
-    console.log(
-      'RESEND RESULT:',
-      JSON.stringify(data, null, 2)
-    );
-
     if (data.error) {
       console.error('RESEND ERROR:', data.error);
 

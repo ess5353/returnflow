@@ -31,7 +31,7 @@ const [logoFile, setLogoFile] = useState<File | null>(null);
     const id = result?.data?.merchantInfo?.id;
 
     if (!id) {
-      console.error('MERCHANT RESULT:', result);
+      console.error('Merchant ID alınamadı:', result);
       return '';
     }
 
@@ -98,12 +98,8 @@ if (logoFile) {
     });
 
  if (uploadError) {
-  console.error("UPLOAD ERROR:", uploadError);
-
-  alert(
-    `Logo yüklenemedi:\n${uploadError.message}`
-  );
-
+  console.error('Logo yüklenemedi:', uploadError);
+  alert(`Logo yüklenemedi:\n${uploadError.message}`);
   return;
 }
 
