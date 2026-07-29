@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
-import { useStoreSettings } from '@/app/hooks/use-store-settings';
+import type { PublicStoreSettings } from '@/app/api/store-settings/route';
 
 export default function ReturnsPage() {
   const [step, setStep] = useState<'search' | 'order' | 'reason' | 'success'>('search');
@@ -16,11 +16,26 @@ export default function ReturnsPage() {
   const [order, setOrder] = useState<any>(null);
   const [createdRfNumber, setCreatedRfNumber] = useState('');
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
-  const { settings, loadSettings } = useStoreSettings();
+  const [settings, setSettings] = useState<PublicStoreSettings | null>(null);
 
   useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+    console.log('[returns] STEP 1: loading public store settings');
+    fetch('/api/store-settings')
+      .then((res) => {
+        console.log('[returns] STEP 2: HTTP status =', res.status);
+        return res.json();
+      })
+      .then((result) => {
+        console.log('[returns] STEP 3: result =', JSON.stringify(result));
+        if (result.data) {
+          console.log('[returns] STEP 4: setSettings called with', JSON.stringify(result.data));
+          setSettings(result.data);
+        } else {
+          console.log('[returns] STEP 4 FAIL: result.data is null');
+        }
+      })
+      .catch((err) => console.error('[returns] fetch error:', err));
+  }, []);
 
   const createReturnRequest = async () => {
     setIsSubmitting(true);
