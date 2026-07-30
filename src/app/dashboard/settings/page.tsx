@@ -1,13 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { AppBridgeHelper } from '@ikas/app-helpers';
 import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/components/ui/toast';
+import { Upload } from 'lucide-react';
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [merchantId, setMerchantId] = useState('');
   const [storeName, setStoreName] = useState('');
   const [notificationEmail, setNotificationEmail] = useState('');
@@ -19,42 +27,25 @@ const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const getMerchantId = async () => {
     const token = await TokenHelpers.getTokenForIframeApp();
-
-    const response = await fetch('/api/ikas/get-merchant', {
-      headers: {
-        Authorization: `JWT ${token}`,
-      },
-    });
-
+    const response = await fetch('/api/ikas/get-merchant', { headers: { Authorization: `JWT ${token}` } });
     const result = await response.json();
-
     const id = result?.data?.merchantInfo?.id;
-
     if (!id) {
       console.error('Merchant ID alınamadı:', result);
       return '';
     }
-
-    return id;
+    return id as string;
   };
 
   const loadSettings = async () => {
     try {
       const id = await getMerchantId();
-
       if (!id) {
         setLoading(false);
         return;
       }
-
       setMerchantId(id);
-
-      const { data } = await supabase
-        .from('store_settings')
-        .select('*')
-        .eq('merchant_id', id)
-        .maybeSingle();
-
+      const { data } = await supabase.from('store_settings').select('*').eq('merchant_id', id).maybeSingle();
       if (data) {
         setStoreName(data.store_name || '');
         setNotificationEmail(data.notification_email || '');
@@ -64,7 +55,6 @@ const [logoFile, setLogoFile] = useState<File | null>(null);
         setReturnAddress(data.return_address || '');
         setReturnPolicy(data.return_policy || '');
       }
-
       setLoading(false);
     } catch (e) {
       console.error(e);
@@ -73,181 +63,199 @@ const [logoFile, setLogoFile] = useState<File | null>(null);
   };
 
   useEffect(() => {
+    AppBridgeHelper.closeLoader();
+  }, []);
+
+  useEffect(() => {
     loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const saveSettings = async () => {
     setSaving(true);
-
     const id = merchantId || (await getMerchantId());
 
     if (!id) {
       setSaving(false);
-      alert('Mağaza bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.');
+      toast('Mağaza bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.', 'error');
       return;
     }
-let uploadedLogo = logoUrl;
 
-if (logoFile) {
-  const fileName = `${merchantId}-${Date.now()}`;
+    let uploadedLogo = logoUrl;
 
-  const { error: uploadError } = await supabase.storage
-    .from('store-assets')
-    .upload(fileName, logoFile, {
-      upsert: true,
-    });
+    if (logoFile) {
+      const fileName = `${merchantId}-${Date.now()}`;
+      const { error: uploadError } = await supabase.storage.from('store-assets').upload(fileName, logoFile, { upsert: true });
 
- if (uploadError) {
-  console.error('Logo yüklenemedi:', uploadError);
-  alert(`Logo yüklenemedi:\n${uploadError.message}`);
-  return;
-}
+      if (uploadError) {
+        console.error('Logo yüklenemedi:', uploadError);
+        toast(`Logo yüklenemedi: ${uploadError.message}`, 'error');
+        setSaving(false);
+        return;
+      }
 
-  const { data } = supabase.storage
-    .from('store-assets')
-    .getPublicUrl(fileName);
+      uploadedLogo = supabase.storage.from('store-assets').getPublicUrl(fileName).data.publicUrl;
+    }
 
-  uploadedLogo = data.publicUrl;
-}
-    const { error } = await supabase
-      .from('store_settings')
-      
-      .upsert(
-        {
-          merchant_id: id,
-          store_name: storeName,
-          notification_email: notificationEmail,
-          support_email: supportEmail,
-          logo_url: uploadedLogo,
-          primary_color: primaryColor,
-          return_address: returnAddress,
-          return_policy: returnPolicy,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'merchant_id',
-        }
-      );
+    const { error } = await supabase.from('store_settings').upsert(
+      {
+        merchant_id: id,
+        store_name: storeName,
+        notification_email: notificationEmail,
+        support_email: supportEmail,
+        logo_url: uploadedLogo,
+        primary_color: primaryColor,
+        return_address: returnAddress,
+        return_policy: returnPolicy,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'merchant_id' },
+    );
 
     setSaving(false);
 
     if (error) {
       console.error(error);
-      alert(JSON.stringify(error, null, 2));
+      toast('Ayarlar kaydedilemedi', 'error');
       return;
     }
 
     setMerchantId(id);
-    alert('Ayarlar kaydedildi.');
+    toast('Ayarlar kaydedildi', 'success');
   };
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-[#f4f5f7] p-8">
-        <p>Ayarlar yükleniyor...</p>
-      </main>
-    );
-  }
-
   return (
-    <main className="min-h-screen bg-[#f4f5f7] p-8">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="text-4xl font-bold tracking-[-0.05em]">
-          Ayarlar
-        </h1>
+    <DashboardShell storeName={storeName || undefined} logoUrl={logoUrl || undefined}>
+      <div className="p-6 md:p-8 max-w-2xl">
+        <h1 className="text-2xl font-bold tracking-tight">Ayarlar</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">Mağaza bilgileri ve iade politikasını buradan yönetin.</p>
 
-        <p className="mt-2 mb-8 text-gray-500">
-          Mağaza ayarlarınızı buradan yönetin.
-        </p>
-
-        <div className="space-y-6">
-          <input
-            value={storeName}
-            onChange={(e) => setStoreName(e.target.value)}
-            placeholder="Mağaza Adı"
-            className="w-full rounded-2xl border p-4"
-          />
-
-          <input
-            value={notificationEmail}
-            onChange={(e) => setNotificationEmail(e.target.value)}
-            placeholder="Bildirim E-postası"
-            className="w-full rounded-2xl border p-4"
-          />
-
-          <input
-            value={supportEmail}
-            onChange={(e) => setSupportEmail(e.target.value)}
-            placeholder="Destek E-postası"
-            className="w-full rounded-2xl border p-4"
-          />
-
-          <div>
-  <label className="mb-2 block font-semibold">
-    Mağaza Logosu
-  </label>
-
-  <input
-    type="file"
-    accept="image/*"
-    onChange={(e) =>
-      setLogoFile(e.target.files?.[0] || null)
-    }
-    className="w-full rounded-2xl border p-4"
-  />
-  {(logoFile || logoUrl) && (
-  <div className="mt-4">
-    <img
-      src={
-        logoFile
-          ? URL.createObjectURL(logoFile)
-          : logoUrl
-      }
-      alt="Logo"
-      className="h-24 w-24 rounded-2xl border object-contain bg-white"
-    />
-  </div>
-)}
-</div>
-
-          <div>
-            <label className="mb-2 block font-semibold">
-              Ana Tema Rengi
-            </label>
-
-            <input
-              type="color"
-              value={primaryColor}
-              onChange={(e) => setPrimaryColor(e.target.value)}
-              className="h-14 w-24 cursor-pointer"
-            />
+        {loading ? (
+          <div className="mt-8 space-y-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
           </div>
+        ) : (
+          <div className="mt-8 space-y-8">
+            {/* Mağaza Bilgileri */}
+            <section>
+              <h2 className="text-sm font-semibold border-b border-border pb-2 mb-4">Mağaza Bilgileri</h2>
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="storeName" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Mağaza Adı
+                  </label>
+                  <Input
+                    id="storeName"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    placeholder="Mağazanızın adını girin"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="notificationEmail" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Bildirim E-postası
+                  </label>
+                  <Input
+                    id="notificationEmail"
+                    value={notificationEmail}
+                    onChange={(e) => setNotificationEmail(e.target.value)}
+                    placeholder="Bildirimler bu adrese gönderilecek"
+                    type="email"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="supportEmail" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Destek E-postası
+                  </label>
+                  <Input
+                    id="supportEmail"
+                    value={supportEmail}
+                    onChange={(e) => setSupportEmail(e.target.value)}
+                    placeholder="Müşterilere gösterilecek destek adresi"
+                    type="email"
+                  />
+                </div>
+              </div>
+            </section>
 
-          <textarea
-            value={returnAddress}
-            onChange={(e) => setReturnAddress(e.target.value)}
-            placeholder="İade Adresi"
-            rows={3}
-            className="w-full rounded-2xl border p-4"
-          />
+            {/* Görünüm */}
+            <section>
+              <h2 className="text-sm font-semibold border-b border-border pb-2 mb-4">Görünüm</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Mağaza Logosu</label>
+                  <div className="flex items-center gap-4">
+                    {(logoFile || logoUrl) && (
+                      <img
+                        src={logoFile ? URL.createObjectURL(logoFile) : logoUrl}
+                        alt="Logo"
+                        className="h-14 w-14 rounded-xl border border-border object-contain bg-white"
+                      />
+                    )}
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted-foreground hover:bg-muted transition-colors">
+                      <Upload className="h-4 w-4" />
+                      Logo Yükle
+                      <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="primaryColor" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Ana Tema Rengi
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="primaryColor"
+                      type="color"
+                      value={primaryColor}
+                      onChange={(e) => setPrimaryColor(e.target.value)}
+                      className="h-10 w-16 cursor-pointer rounded-lg border border-border"
+                    />
+                    <span className="font-mono text-xs text-muted-foreground">{primaryColor}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-          <textarea
-            value={returnPolicy}
-            onChange={(e) => setReturnPolicy(e.target.value)}
-            placeholder="İade Politikası"
-            rows={6}
-            className="w-full rounded-2xl border p-4"
-          />
+            {/* İade Ayarları */}
+            <section>
+              <h2 className="text-sm font-semibold border-b border-border pb-2 mb-4">İade Ayarları</h2>
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="returnAddress" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    İade Adresi
+                  </label>
+                  <Textarea
+                    id="returnAddress"
+                    value={returnAddress}
+                    onChange={(e) => setReturnAddress(e.target.value)}
+                    placeholder="Müşterilerin ürünleri gönderecekleri adres"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="returnPolicy" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    İade Politikası
+                  </label>
+                  <Textarea
+                    id="returnPolicy"
+                    value={returnPolicy}
+                    onChange={(e) => setReturnPolicy(e.target.value)}
+                    placeholder="İade koşulları ve politikanızı buraya yazın"
+                    rows={6}
+                  />
+                </div>
+              </div>
+            </section>
 
-          <button
-            onClick={saveSettings}
-            disabled={saving}
-            className="w-full rounded-2xl bg-black py-4 font-bold text-white disabled:opacity-50"
-          >
-            {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
-          </button>
-        </div>
+            <Button onClick={saveSettings} disabled={saving} className="w-full">
+              {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
+            </Button>
+          </div>
+        )}
       </div>
-    </main>
+    </DashboardShell>
   );
 }

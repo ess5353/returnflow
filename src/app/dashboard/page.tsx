@@ -1,11 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
-import Link from 'next/link';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/components/ui/toast';
+import { Check, ChevronRight, Copy, RefreshCw, Trash2, X } from 'lucide-react';
 
 type ReturnRequest = {
   id: string;
@@ -13,13 +21,7 @@ type ReturnRequest = {
   rf_number: string;
   customer_name: string;
   product: string;
-  products:
-    | {
-        name: string;
-        quantity: number;
-        price: number;
-      }[]
-    | null;
+  products: { name: string; quantity: number; price: number }[] | null;
   reason: string;
   description: string | null;
   admin_note: string | null;
@@ -39,26 +41,38 @@ type IkasOrder = {
   items: { name: string; sku?: string; quantity: number; price: number }[];
 };
 
+function statusVariant(status: string): 'pending' | 'approved' | 'rejected' | 'secondary' {
+  if (status === 'Onaylandı') return 'approved';
+  if (status === 'Reddedildi') return 'rejected';
+  if (status === 'Yeni Talep') return 'pending';
+  return 'secondary';
+}
+
+const DATE_FILTERS = ['Bugün', 'Son 7 Gün', 'Son 30 Gün', 'Bu Ay', 'Tümü'] as const;
+const STATUS_FILTERS = ['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'] as const;
+const PORTAL_URL = 'https://returnflow-git-main-ess7.vercel.app/returns';
+
 export default function DashboardPage() {
   const [requests, setRequests] = useState<ReturnRequest[]>([]);
   const [orders, setOrders] = useState<IkasOrder[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Tümü');
   const [search, setSearch] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [dateFilter, setDateFilter] = useState('Tümü');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const { settings, loadSettings: fetchSettings } = useStoreSettings();
 
   const fetchRequests = async () => {
-    const { data, error } = await supabase
-      .from('return_requests')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('return_requests').select('*').order('created_at', { ascending: false });
 
     if (error) {
       console.error(error);
-      alert('İade talepleri alınamadı');
+      toast('İade talepleri alınamadı', 'error');
+      setLoading(false);
       return;
     }
 
@@ -69,18 +83,9 @@ export default function DashboardPage() {
 
   const fetchOrders = async () => {
     const token = await TokenHelpers.getTokenForIframeApp();
-
-    const response = await fetch('/api/ikas/orders', {
-      headers: {
-        Authorization: `JWT ${token}`,
-      },
-    });
-
+    const response = await fetch('/api/ikas/orders', { headers: { Authorization: `JWT ${token}` } });
     const data = await response.json();
-
-    if (data.success) {
-      setOrders(data.orders);
-    }
+    if (data.success) setOrders(data.orders);
   };
 
   useEffect(() => {
@@ -96,26 +101,55 @@ export default function DashboardPage() {
 
   const updateStatus = async (status: string) => {
     if (!selectedRequest) return;
-
+    setUpdatingStatus(true);
     const { error } = await supabase.from('return_requests').update({ status }).eq('id', selectedRequest.id);
+    setUpdatingStatus(false);
 
     if (error) {
       console.error(error);
-      alert('Durum güncellenemedi');
+      toast('Durum güncellenemedi', 'error');
       return;
     }
 
     await fetchRequests();
+    setSelectedRequest({ ...selectedRequest, status });
+    toast(status === 'Onaylandı' ? 'Talep onaylandı' : 'Talep reddedildi', 'success');
+  };
 
-    setSelectedRequest({
-      ...selectedRequest,
-      status,
-    });
+  const saveNote = async () => {
+    if (!selectedRequest) return;
+    setSavingNote(true);
+    const { error } = await supabase.from('return_requests').update({ admin_note: adminNote }).eq('id', selectedRequest.id);
+    setSavingNote(false);
+
+    if (error) {
+      console.error(error);
+      toast('Not kaydedilemedi', 'error');
+      return;
+    }
+
+    await fetchRequests();
+    toast('Not kaydedildi', 'success');
+  };
+
+  const handleDelete = async () => {
+    if (!selectedRequest) return;
+    const { error } = await supabase.from('return_requests').delete().eq('id', selectedRequest.id);
+
+    if (error) {
+      console.error(error);
+      toast('Talep silinemedi', 'error');
+      return;
+    }
+
+    setDeleteDialogOpen(false);
+    setSelectedRequest(null);
+    await fetchRequests();
+    toast('Talep silindi', 'success');
   };
 
   const filteredRequests = requests.filter((r) => {
     const matchesFilter = filter === 'Tümü' || r.status === filter;
-
     const matchesSearch =
       (r.customer_name || '').toLowerCase().includes(search.toLowerCase()) ||
       (r.customer_email || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -124,476 +158,410 @@ export default function DashboardPage() {
 
     const createdAt = new Date(r.created_at);
     const now = new Date();
-
     let matchesDate = true;
 
-    if (dateFilter === 'Bugün') {
-      matchesDate = createdAt.toDateString() === now.toDateString();
-    }
-
-    if (dateFilter === 'Son 7 Gün') {
-      matchesDate = createdAt >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    }
-
-    if (dateFilter === 'Son 30 Gün') {
-      matchesDate = createdAt >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    }
-
-    if (dateFilter === 'Bu Ay') {
-      matchesDate = createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
-    }
+    if (dateFilter === 'Bugün') matchesDate = createdAt.toDateString() === now.toDateString();
+    if (dateFilter === 'Son 7 Gün') matchesDate = createdAt >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (dateFilter === 'Son 30 Gün') matchesDate = createdAt >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (dateFilter === 'Bu Ay') matchesDate = createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
 
     return matchesFilter && matchesSearch && matchesDate;
   });
 
-  const statsRequests = filteredRequests;
-  const totalReturnAmount = statsRequests.reduce((total, item) => total + Number(item.amount || 0), 0);
-  const selected = selectedRequest;
+  const totalReturnAmount = filteredRequests.reduce((t, r) => t + Number(r.amount || 0), 0);
 
-  const reasonCounts = statsRequests.reduce(
-    (acc: Record<string, number>, item) => {
-      acc[item.reason] = (acc[item.reason] || 0) + 1;
+  const reasonCounts = filteredRequests.reduce(
+    (acc: Record<string, number>, r) => {
+      acc[r.reason] = (acc[r.reason] || 0) + 1;
       return acc;
     },
     {},
   );
 
   const topReason = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0];
+  const reasonStats = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  const reasonStats = Object.entries(reasonCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+  const stats = [
+    { label: 'Toplam İade', value: filteredRequests.length },
+    { label: 'Yeni Talep', value: filteredRequests.filter((r) => r.status === 'Yeni Talep').length },
+    { label: 'Onaylanan', value: filteredRequests.filter((r) => r.status === 'Onaylandı').length },
+    { label: 'Reddedilen', value: filteredRequests.filter((r) => r.status === 'Reddedildi').length },
+    { label: 'Toplam Tutar', value: `₺${totalReturnAmount.toLocaleString('tr-TR')}` },
+    { label: 'Baş. Sebep', value: topReason?.[0] ?? '—', sub: topReason ? `${topReason[1]} kez` : undefined },
+  ];
+
+  const selected = selectedRequest;
 
   return (
-    <main className="min-h-screen bg-[#f4f5f7] p-4 md:p-8 text-[#111]">
-      <section className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+    <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
+      <div className="p-6 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="mb-8 flex items-center gap-4">
-              {settings?.logo_url && (
-                <img
-                  src={settings.logo_url}
-                  alt="Store Logo"
-                  className="h-14 w-14 rounded-2xl border bg-white object-contain p-2"
-                />
-              )}
-
-              <div>
-                <div className="text-xs font-bold tracking-[0.3em] text-gray-500 uppercase">ReturnFlow</div>
-
-                <h1 className="text-3xl font-bold">{settings?.store_name || 'PELYXCOMMERCE'}</h1>
-              </div>
-            </div>
-
-            <h1 className="text-4xl md:text-6xl font-bold tracking-[-0.07em]">İade Yönetim Paneli</h1>
-
-            <p className="mt-3 max-w-xl text-gray-500 text-base md:text-lg">
-              İade taleplerini tek panelden yönet, onayla ve süreci müşteriye daha profesyonel yaşat.
-            </p>
+            <h1 className="text-2xl font-bold tracking-tight">İade Talepleri</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">Müşterilerden gelen iade taleplerini buradan yönetin.</p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setLoading(true);
+              fetchRequests();
+              fetchOrders();
+              fetchSettings();
+            }}
+            className="shrink-0 gap-2"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Yenile
+          </Button>
+        </div>
 
-          <div className="flex gap-3">
-            <Link href="/dashboard/settings" className="rounded-2xl border border-gray-200 bg-white px-6 py-4 font-bold">
-              ⚙️ Ayarlar
-            </Link>
-
+        {/* Date filters */}
+        <div className="flex flex-wrap gap-1.5">
+          {DATE_FILTERS.map((d) => (
             <button
-              onClick={() => {
-                fetchRequests();
-                fetchOrders();
-                fetchSettings();
-              }}
-              className="rounded-2xl bg-black px-6 py-4 font-bold text-white shadow-xl"
+              key={d}
+              onClick={() => setDateFilter(d)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                dateFilter === d ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
             >
-              Yenile
+              {d}
             </button>
-          </div>
+          ))}
+        </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {['Bugün', 'Son 7 Gün', 'Son 30 Gün', 'Bu Ay', 'Tümü'].map((item) => (
-              <button
-                key={item}
-                onClick={() => setDateFilter(item)}
-                className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-                  dateFilter === item ? 'bg-black text-white' : 'bg-gray-100 text-black'
-                }`}
-              >
-                {item}
-              </button>
-            ))}
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {stats.map((s) => (
+            <div key={s.label} className="rounded-xl border border-border bg-card p-4 shadow-xs">
+              <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
+              <p className="mt-1.5 text-2xl font-bold tracking-tight">{s.value}</p>
+              {s.sub && <p className="mt-0.5 text-xs text-muted-foreground">{s.sub}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* Portal link */}
+        <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+          <p className="text-xs font-medium text-muted-foreground mb-2">İade Portal Linki</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 truncate rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{PORTAL_URL}</code>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 gap-1.5"
+              onClick={() => {
+                navigator.clipboard.writeText(PORTAL_URL);
+                toast('Portal linki kopyalandı', 'success');
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Kopyala
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.9fr] gap-5">
-          <div className="space-y-5">
-            <div className="rounded-[32px] bg-black p-6 md:p-8 text-white shadow-2xl">
-              <p className="text-white/50 font-semibold">İade Portal Linki</p>
-
-              <h2 className="mt-3 text-2xl md:text-3xl font-bold tracking-[-0.05em]">
-                Bu linki mağazanızdaki &ldquo;İade &amp; Değişim&rdquo; alanına ekleyin.
-              </h2>
-
-              <div className="mt-6 flex flex-col md:flex-row gap-3 rounded-2xl bg-white/10 p-4 border border-white/10">
-                <span className="flex-1 break-all text-white/80">https://returnflow-git-main-ess7.vercel.app/returns</span>
-
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText('https://returnflow-git-main-ess7.vercel.app/returns');
-                    alert('Portal linki kopyalandı');
-                  }}
-                  className="rounded-xl bg-white px-5 py-3 font-extrabold text-black"
-                >
-                  Kopyala
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-                <p className="text-gray-500 font-semibold">Toplam İade</p>
-                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">{statsRequests.length}</h3>
-              </div>
-
-              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-                <p className="text-gray-500 font-semibold">Yeni Talep</p>
-                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-                  {statsRequests.filter((r) => r.status === 'Yeni Talep').length}
-                </h3>
-              </div>
-
-              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-                <p className="text-gray-500 font-semibold">Onaylanan</p>
-                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-                  {statsRequests.filter((r) => r.status === 'Onaylandı').length}
-                </h3>
-              </div>
-
-              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-                <p className="text-gray-500 font-semibold">Reddedilen</p>
-                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">
-                  {statsRequests.filter((r) => r.status === 'Reddedildi').length}
-                </h3>
-              </div>
-
-              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-                <p className="text-gray-500 font-semibold">Toplam İade Tutarı</p>
-                <h3 className="mt-3 text-4xl font-bold tracking-[-0.06em]">₺{totalReturnAmount.toLocaleString('tr-TR')}</h3>
-              </div>
-
-              <div className="rounded-[28px] bg-white p-6 shadow-sm border border-gray-100">
-                <p className="text-gray-500 font-semibold">En Çok İade Sebebi</p>
-                <h3 className="mt-3 text-xl font-bold">{topReason ? topReason[0] : '-'}</h3>
-                <p className="mt-2 text-sm text-gray-500">{topReason ? `${topReason[1]} kez` : ''}</p>
-              </div>
-            </div>
-
-            <div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
-              <h2 className="text-2xl font-bold tracking-[-0.04em]">İade Sebebi Analizi</h2>
-
-              <p className="mt-1 text-gray-500">En çok gelen iade sebeplerini gör.</p>
-
-              <div className="mt-6 space-y-4">
-                {reasonStats.map(([reason, count]) => (
-                  <div key={reason}>
-                    <div className="mb-2 flex justify-between text-sm font-bold">
-                      <span>{reason}</span>
-                      <span>{count} kez</span>
+        {/* Main content grid */}
+        <div className="grid lg:grid-cols-[1fr_360px] gap-6">
+          {/* Left column */}
+          <div className="space-y-4">
+            {/* Reason analysis */}
+            {reasonStats.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+                <h2 className="text-sm font-semibold mb-3">İade Sebebi Analizi</h2>
+                <div className="space-y-3">
+                  {reasonStats.map(([reason, count]) => (
+                    <div key={reason}>
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span className="font-medium">{reason}</span>
+                        <span className="text-muted-foreground">{count} kez</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{
+                            width: `${filteredRequests.length ? Math.min((count / filteredRequests.length) * 100, 100) : 0}%`,
+                          }}
+                        />
+                      </div>
                     </div>
-
-                    <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-black"
-                        style={{
-                          width: `${statsRequests.length ? Math.min((count / statsRequests.length) * 100, 100) : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
-              <h2 className="text-2xl md:text-3xl font-bold tracking-[-0.05em]">İkas Son Siparişler</h2>
-
-              <p className="mt-1 text-gray-500">Mağazanızdan gelen son siparişler.</p>
-
-              <div className="mt-6 space-y-3">
-                {orders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 rounded-3xl border border-gray-100 bg-[#fafafa] p-5 md:items-center"
-                  >
-                    <div>
-                      <p className="text-sm text-gray-400">Sipariş</p>
-                      <strong>#{order.orderNumber}</strong>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-gray-400">Müşteri</p>
-                      <strong>{order.customerName}</strong>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-gray-400">Ürün</p>
-                      <strong>{order.items?.[0]?.name || '-'}</strong>
-                    </div>
-
-                    <div className="text-left md:text-right">
-                      <p className="font-bold">₺{order.totalPrice}</p>
-                      <span className="text-xs font-bold text-gray-500">{order.status}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[32px] bg-white p-5 md:p-7 shadow-sm border border-gray-100">
-              <div className="mb-6">
-                <h2 className="text-2xl md:text-3xl font-bold tracking-[-0.05em]">İade Talepleri</h2>
-                <p className="mt-1 text-gray-500">Müşterilerden gelen gerçek iade kayıtları.</p>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <div className="mt-4">
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="RF No, Sipariş No, Müşteri veya E-posta ara..."
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-black"
-                    />
-                  </div>
-                  {['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'].map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setFilter(item)}
-                      className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-                        filter === item ? 'bg-black text-white' : 'bg-gray-100 text-black'
-                      }`}
-                    >
-                      {item}
-                    </button>
                   ))}
                 </div>
               </div>
+            )}
 
-              {loading && <p className="text-gray-500">Yükleniyor...</p>}
-
-              {!loading && requests.length === 0 && <p className="text-gray-500">Henüz iade talebi yok.</p>}
-
-              <div className="space-y-3">
-                {filteredRequests.map((request) => {
-                  const isSelected = selected?.id === request.id;
-
-                  return (
-                    <div
-                      key={request.id}
-                      className={`grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr_auto] gap-4 rounded-3xl border p-5 md:items-center transition ${
-                        isSelected ? 'border-black bg-white shadow-md' : 'border-gray-100 bg-[#fafafa]'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <strong>{request.rf_number}</strong>
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${
-                              request.status === 'Onaylandı'
-                                ? 'bg-green-100 text-green-700'
-                                : request.status === 'Reddedildi'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-yellow-100 text-yellow-700'
-                            }`}
-                          >
-                            {request.status}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-gray-500">
-                          {request.order_id} — {request.customer_name}
-                        </p>
-
-                        <p className="mt-1 font-semibold">{request.product}</p>
-                      </div>
-                      <p className="mt-1 text-sm text-gray-400">{request.customer_email || 'E-posta yok'}</p>
-                      <div>
-                        <p className="text-sm text-gray-400">Sebep</p>
-                        <strong>{request.reason}</strong>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-gray-400">Tutar</p>
-                        <strong>{request.amount}</strong>
-                      </div>
-
+            {/* Return requests */}
+            <div className="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
+              <div className="border-b border-border p-4">
+                <h2 className="text-sm font-semibold">İade Talepleri</h2>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="RF No, Sipariş, Müşteri..."
+                    className="max-w-xs h-8 text-xs"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {STATUS_FILTERS.map((s) => (
                       <button
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          setAdminNote(request.admin_note || '');
-                        }}
-                        className="rounded-2xl bg-black px-5 py-3 font-bold text-white"
+                        key={s}
+                        onClick={() => setFilter(s)}
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                          filter === s ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'
+                        }`}
                       >
-                        İncele
+                        {s}
                       </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="divide-y divide-border">
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 p-4">
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-3.5 w-28" />
+                        <Skeleton className="h-3 w-44" />
+                      </div>
+                      <Skeleton className="h-3.5 w-16" />
                     </div>
-                  );
-                })}
+                  ))
+                ) : filteredRequests.length === 0 ? (
+                  <div className="py-12 text-center text-sm text-muted-foreground">
+                    {requests.length === 0 ? 'Henüz iade talebi yok.' : 'Filtreyle eşleşen talep bulunamadı.'}
+                  </div>
+                ) : (
+                  filteredRequests.map((req) => {
+                    const isSelected = selected?.id === req.id;
+                    return (
+                      <button
+                        key={req.id}
+                        onClick={() => {
+                          setSelectedRequest(req);
+                          setAdminNote(req.admin_note || '');
+                        }}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
+                          isSelected ? 'bg-muted/50' : ''
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-medium text-foreground">{req.rf_number}</span>
+                            <Badge variant={statusVariant(req.status)}>{req.status}</Badge>
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                            {req.order_id} · {req.customer_name}
+                          </p>
+                        </div>
+                        <div className="hidden sm:block shrink-0 text-right">
+                          <p className="text-xs font-semibold">₺{Number(req.amount).toLocaleString('tr-TR')}</p>
+                          <p className="text-xs text-muted-foreground">{req.reason}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
+
+            {/* Recent ikas orders */}
+            {orders.length > 0 && (
+              <div className="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
+                <div className="border-b border-border p-4">
+                  <h2 className="text-sm font-semibold">İkas Son Siparişler</h2>
+                </div>
+                <div className="divide-y divide-border">
+                  {orders.map((order) => (
+                    <div key={order.id} className="flex items-center gap-4 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate">
+                          #{order.orderNumber} · {order.customerName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{order.items?.[0]?.name || '—'}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs font-semibold">₺{order.totalPrice}</p>
+                        <p className="text-xs text-muted-foreground">{order.status}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          <aside className="rounded-[32px] bg-white p-6 md:p-8 shadow-sm border border-gray-100 h-fit lg:sticky lg:top-8">
-            <p className="text-gray-500 font-semibold">Seçili İade Talebi</p>
-
+          {/* Detail panel */}
+          <aside className="rounded-xl border border-border bg-card shadow-xs h-fit lg:sticky lg:top-6">
             {!selected ? (
-              <p className="mt-4 text-gray-500">Henüz talep yok.</p>
+              <div className="py-12 px-4 text-center text-sm text-muted-foreground">
+                <p>Detayları görüntülemek için</p>
+                <p>bir talep seçin.</p>
+              </div>
             ) : (
-              <>
-                <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em]">{selected.rf_number}</h2>
+              <div>
+                {/* Panel header */}
+                <div className="border-b border-border p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-mono text-xs text-muted-foreground">{selected.rf_number}</p>
+                      <h2 className="mt-0.5 text-base font-bold">{selected.customer_name}</h2>
+                    </div>
+                    <Badge variant={statusVariant(selected.status)}>{selected.status}</Badge>
+                  </div>
+                </div>
 
-                <div className="mt-6 space-y-5">
-                  <div>
-                    <p className="text-sm text-gray-400">Sipariş</p>
-                    <strong>{selected.order_id}</strong>
+                {/* Panel body */}
+                <div className="p-4 space-y-4 text-sm">
+                  {/* Info grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Sipariş</p>
+                      <p className="font-medium text-sm">{selected.order_id}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Tutar</p>
+                      <p className="font-medium text-sm">₺{Number(selected.amount).toLocaleString('tr-TR')}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">E-posta</p>
+                      <p className="font-medium text-sm">{selected.customer_email || '—'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">İade Sebebi</p>
+                      <p className="font-medium text-sm">{selected.reason}</p>
+                    </div>
                   </div>
 
-                  <div>
-                    <p className="text-sm text-gray-400">Müşteri</p>
-                    <strong>{selected.customer_name}</strong>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-gray-400">E-posta</p>
-                    <strong>{selected.customer_email || '-'}</strong>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-gray-400 mb-3">İade Edilen Ürünler</p>
-
-                    {selected.products && selected.products.length > 0 ? (
-                      <div className="space-y-3">
-                        {selected.products.map((item, index) => (
-                          <div key={index} className="rounded-2xl bg-[#f4f5f7] p-4">
-                            <p className="font-bold">{item.name}</p>
-
-                            <p className="text-sm text-gray-500 mt-1">
-                              {item.quantity} Adet • ₺{item.price}
+                  {/* Products */}
+                  {selected.products && selected.products.length > 0 ? (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">İade Edilen Ürünler</p>
+                      <div className="space-y-2">
+                        {selected.products.map((item, i) => (
+                          <div key={i} className="rounded-lg bg-muted px-3 py-2">
+                            <p className="text-xs font-medium">{item.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.quantity} adet · ₺{item.price}
                             </p>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <strong>{selected.product}</strong>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-gray-400">İade Sebebi</p>
-                    <strong>{selected.reason}</strong>
-                  </div>
-
-                  {selected.description && (
+                    </div>
+                  ) : (
                     <div>
-                      <p className="text-sm text-gray-400">Açıklama</p>
-
-                      <div className="mt-2 rounded-2xl bg-[#f4f5f7] p-4 text-sm leading-6">{selected.description}</div>
+                      <p className="text-xs text-muted-foreground">Ürün</p>
+                      <p className="font-medium text-sm">{selected.product}</p>
                     </div>
                   )}
 
-                  <div>
-                    <p className="text-sm text-gray-400">Tutar</p>
-                    <strong>{selected.amount}</strong>
-                  </div>
+                  {/* Description */}
+                  {selected.description && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Açıklama</p>
+                      <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-relaxed">{selected.description}</p>
+                    </div>
+                  )}
 
-                  <div>
-                    <p className="text-sm text-gray-400">Durum</p>
-                    <strong>{selected.status}</strong>
-                  </div>
-
+                  {/* Media */}
                   {selected.media_urls && selected.media_urls.length > 0 && (
                     <div>
-                      <p className="text-sm text-gray-400 mb-3">Kanıt Dosyaları</p>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        {selected.media_urls.map((url, index) => {
-                          const isVideo = url.includes('.mp4') || url.includes('.mov') || url.includes('.webm');
-
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Kanıt Dosyaları</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selected.media_urls.map((url, i) => {
+                          const isVideo = /\.(mp4|mov|webm)/.test(url);
                           return isVideo ? (
-                            <video key={index} controls className="w-full rounded-2xl border">
+                            <video key={i} controls className="w-full rounded-lg border border-border">
                               <source src={url} />
                             </video>
                           ) : (
-                            <img key={index} src={url} alt="Return media" className="w-full rounded-2xl border" />
+                            <img key={i} src={url} alt="Return media" className="w-full rounded-lg border border-border object-cover" />
                           );
                         })}
                       </div>
                     </div>
                   )}
 
-                  <div className="rounded-3xl bg-[#f4f5f7] p-5">
-                    <p className="text-sm text-gray-500">
-                      Bu alanda mağaza sahibi seçilen iade talebini inceleyip onay/red işlemi yapacak.
-                    </p>
+                  {/* Admin note */}
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Mağaza Notu</p>
+                    <Textarea
+                      value={adminNote}
+                      onChange={(e) => setAdminNote(e.target.value)}
+                      rows={3}
+                      placeholder="Not bırak..."
+                      className="text-xs"
+                    />
+                    <Button variant="outline" size="sm" onClick={saveNote} disabled={savingNote} className="mt-2 w-full text-xs">
+                      {savingNote ? 'Kaydediliyor...' : 'Notu Kaydet'}
+                    </Button>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <p className="text-sm text-gray-400 mb-2">Mağaza Notu</p>
-
-                      <textarea
-                        value={adminNote}
-                        onChange={(e) => setAdminNote(e.target.value)}
-                        rows={4}
-                        className="w-full rounded-2xl border border-gray-200 p-4"
-                        placeholder="İade ile ilgili not bırak..."
-                      />
-                    </div>
-
-                    <button
-                      onClick={async () => {
-                        if (!selected) return;
-
-                        await supabase.from('return_requests').update({ admin_note: adminNote }).eq('id', selected.id);
-
-                        await fetchRequests();
-                      }}
-                      className="rounded-2xl border border-gray-200 py-3 font-bold"
+                  {/* Actions */}
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <Button
+                      size="sm"
+                      className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => updateStatus('Onaylandı')}
+                      disabled={updatingStatus || selected.status === 'Onaylandı'}
                     >
-                      Notu Kaydet
-                    </button>
-
-                    <button onClick={() => updateStatus('Onaylandı')} className="rounded-2xl bg-black py-4 font-bold text-white">
-                      Talebi Onayla
-                    </button>
-
-                    <button onClick={() => updateStatus('Reddedildi')} className="rounded-2xl border border-gray-200 py-4 font-bold">
-                      Talebi Reddet
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        if (!selected) return;
-
-                        const { error } = await supabase.from('return_requests').delete().eq('id', selected.id);
-
-                        if (error) {
-                          console.error(error);
-                          alert('Talep silinemedi');
-                          return;
-                        }
-
-                        await fetchRequests();
-                        setSelectedRequest(null);
-                      }}
-                      className="rounded-2xl bg-red-500 py-4 font-bold text-white"
+                      <Check className="h-3.5 w-3.5" />
+                      Onayla
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => updateStatus('Reddedildi')}
+                      disabled={updatingStatus || selected.status === 'Reddedildi'}
                     >
+                      <X className="h-3.5 w-3.5" />
+                      Reddet
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                       Talebi Sil
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </aside>
         </div>
-      </section>
-    </main>
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog.Root open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in duration-150" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <Dialog.Title className="text-base font-bold">Talebi Sil</Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-muted-foreground">
+              <strong className="text-foreground">{selected?.rf_number}</strong> numaralı iade talebi kalıcı olarak silinecek. Bu işlem geri
+              alınamaz.
+            </Dialog.Description>
+            <div className="mt-5 flex gap-2">
+              <Dialog.Close asChild>
+                <Button variant="outline" className="flex-1">
+                  İptal
+                </Button>
+              </Dialog.Close>
+              <Button variant="destructive" className="flex-1" onClick={handleDelete}>
+                Sil
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </DashboardShell>
   );
 }

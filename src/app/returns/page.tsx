@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
+import { toast } from '@/components/ui/toast';
 import type { PublicStoreSettings } from '@/app/api/store-settings/route';
 
 export default function ReturnsPage() {
@@ -22,9 +23,7 @@ export default function ReturnsPage() {
     fetch('/api/store-settings')
       .then((res) => res.json())
       .then((result) => {
-        if (result.data) {
-          setSettings(result.data);
-        }
+        if (result.data) setSettings(result.data);
       })
       .catch((err) => console.error('Store settings yüklenemedi:', err));
   }, []);
@@ -37,7 +36,6 @@ export default function ReturnsPage() {
     if (files) {
       for (const file of Array.from(files)) {
         const extension = file.name.split('.').pop();
-
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extension}`;
 
         const { error: uploadError } = await supabase.storage.from('return-files').upload(fileName, file);
@@ -45,20 +43,17 @@ export default function ReturnsPage() {
         if (uploadError) {
           console.error('Dosya yüklenemedi:', uploadError);
           setIsSubmitting(false);
-          alert('Dosya yüklenemedi');
+          toast('Dosya yüklenemedi', 'error');
           return;
         }
 
         const { data } = supabase.storage.from('return-files').getPublicUrl(fileName);
-
         uploadedUrls.push(data.publicUrl);
       }
     }
 
     const now = new Date();
-
     const datePart = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
-
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
     const { count, error: countError } = await supabase
@@ -69,7 +64,7 @@ export default function ReturnsPage() {
     if (countError) {
       console.error(countError);
       setIsSubmitting(false);
-      alert('RF numarası oluşturulamadı');
+      toast('RF numarası oluşturulamadı', 'error');
       return;
     }
 
@@ -99,15 +94,13 @@ export default function ReturnsPage() {
     if (error) {
       console.error(error);
       setIsSubmitting(false);
-      alert('Kayıt sırasında hata oluştu');
+      toast('Kayıt sırasında hata oluştu', 'error');
       return;
     }
 
     await fetch('/api/email/return-created', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
         customerName: order.customer_name,
@@ -125,24 +118,18 @@ export default function ReturnsPage() {
     const existingRequest = await supabase.from('return_requests').select('id').eq('order_id', orderNo);
 
     if (existingRequest.data && existingRequest.data.length > 0) {
-      alert('Bu sipariş için zaten iade talebi oluşturulmuş.');
+      toast('Bu sipariş için zaten iade talebi oluşturulmuş.', 'error');
       return;
     }
 
     const token = await TokenHelpers.getTokenForIframeApp();
-
     const url = `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}&email=${encodeURIComponent(email)}`;
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `JWT ${token}`,
-      },
-    });
-
+    const response = await fetch(url, { headers: { Authorization: `JWT ${token}` } });
     const result = await response.json();
 
     if (!result.success) {
-      alert('Sipariş bulunamadı');
+      toast('Sipariş bulunamadı', 'error');
       return;
     }
 
@@ -150,83 +137,113 @@ export default function ReturnsPage() {
     setStep('order');
   };
 
+  const accentColor = settings?.primary_color || '#000000';
+
+  const STEPS = ['Sipariş Bul', 'Ürün Seç', 'Sebep Gir'] as const;
+  const stepIndex = step === 'search' ? 0 : step === 'order' ? 1 : step === 'reason' ? 2 : 3;
+
   return (
-    <main className="min-h-screen bg-[#f5f6fa] px-4 py-8 md:p-10 text-[#111]">
+    <main className="min-h-screen bg-[#f5f6fa] px-4 py-8 md:p-10">
       <section className="mx-auto max-w-5xl">
-        <div className="rounded-[32px] md:rounded-[44px] bg-white shadow-2xl overflow-hidden border border-gray-100">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr]">
-            <div
-              style={{
-                background: settings?.primary_color || '#000000',
-              }}
-              className="text-white p-8 md:p-12 relative overflow-hidden"
-            >
-              <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gradient-to-br from-blue-300 to-indigo-500 opacity-40" />
+        <div className="rounded-3xl bg-white shadow-xl overflow-hidden border border-gray-100">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr]">
+            {/* Left panel */}
+            <div style={{ background: accentColor }} className="text-white p-8 md:p-10 relative overflow-hidden">
+              <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/10" />
+              <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-white/5" />
 
               <div className="relative z-10">
-                <div className="mb-8 flex items-center gap-4">
+                {/* Branding */}
+                <div className="mb-8 flex items-center gap-3">
                   {settings?.logo_url && (
-                    <img src={settings.logo_url} alt="Logo" className="h-14 w-14 rounded-2xl bg-white object-contain p-2" />
+                    <img src={settings.logo_url} alt="Logo" className="h-12 w-12 rounded-xl bg-white object-contain p-2 border border-white/20" />
                   )}
-
                   <div>
-                    <div className="text-xs font-bold tracking-[0.25em] text-white/70">RETURN PORTAL</div>
-
-                    <div className="text-xl font-bold">{settings?.store_name || 'PELYXCOMMERCE'}</div>
+                    <div className="text-[10px] font-bold tracking-[0.3em] text-white/60 uppercase">Return Portal</div>
+                    <div className="text-lg font-bold leading-tight">{settings?.store_name || 'PELYXCOMMERCE'}</div>
                   </div>
                 </div>
 
-                <h1 className="text-4xl md:text-6xl font-bold tracking-[-0.07em] leading-none">İade Merkezi</h1>
-
-                <p className="text-white/60 mt-5 text-lg leading-8">
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-none">İade Merkezi</h1>
+                <p className="mt-4 text-white/70 text-base leading-7">
                   Sipariş bilgilerinizi girin, iade talebinizi birkaç adımda oluşturun.
                 </p>
 
-                {settings?.support_email && <p className="mt-6 text-sm text-white/70">Destek: {settings.support_email}</p>}
+                {settings?.support_email && (
+                  <p className="mt-5 text-sm text-white/60">Destek: {settings.support_email}</p>
+                )}
 
                 {settings?.return_policy && (
-                  <div className="mt-6 rounded-2xl bg-white/10 p-4 text-sm leading-6 text-white/90">
-                    <strong>İade Politikası</strong>
-
-                    <p className="mt-2 whitespace-pre-line">{settings.return_policy}</p>
+                  <div className="mt-5 rounded-2xl bg-white/10 p-4 text-sm leading-6 text-white/90 border border-white/10">
+                    <strong className="block mb-1">İade Politikası</strong>
+                    <p className="whitespace-pre-line text-white/80">{settings.return_policy}</p>
                   </div>
                 )}
 
-                <div className="mt-10 space-y-4">
-                  {['Siparişinizi bulun', 'İade sebebinizi seçin', 'Talebinizi mağazaya iletin'].map((item, index) => (
-                    <div key={item} className="flex items-center gap-4">
-                      <div className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center font-bold">
-                        {index + 1}
+                {/* Steps indicator */}
+                {step !== 'success' && (
+                  <div className="mt-10 space-y-3">
+                    {STEPS.map((label, i) => (
+                      <div key={label} className="flex items-center gap-3">
+                        <div
+                          className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
+                            i < stepIndex
+                              ? 'bg-white text-black'
+                              : i === stepIndex
+                                ? 'bg-white text-black'
+                                : 'bg-white/20 text-white/60'
+                          }`}
+                        >
+                          {i < stepIndex ? '✓' : i + 1}
+                        </div>
+                        <span className={`text-sm font-medium ${i <= stepIndex ? 'text-white' : 'text-white/50'}`}>{label}</span>
                       </div>
-                      <span className="text-white/80">{item}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="p-6 md:p-12">
+            {/* Right panel */}
+            <div className="p-7 md:p-10">
               {step === 'search' && (
                 <>
-                  <h2 className="text-3xl md:text-4xl font-bold tracking-[-0.05em]">Siparişimi Bul</h2>
-                  <p className="text-gray-500 mt-3 mb-8">
-                    İade talebi oluşturmak için sipariş numaranızı ve telefon/e-posta bilginizi girin.
+                  <h2 className="text-2xl font-bold tracking-tight">Siparişimi Bul</h2>
+                  <p className="text-muted-foreground mt-2 mb-7 text-sm">
+                    İade talebi oluşturmak için sipariş numaranızı ve e-posta adresinizi girin.
                   </p>
 
-                  <div className="space-y-5">
-                    <input
-                      value={orderNo}
-                      onChange={(e) => setOrderNo(e.target.value)}
-                      placeholder="Sipariş numarası — örn: #1001"
-                      className="w-full rounded-2xl border border-gray-200 px-5 py-4 outline-none focus:border-black"
-                    />
-                    <input
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="E-posta adresiniz"
-                      className="w-full rounded-2xl border border-gray-200 px-5 py-4 outline-none focus:border-black"
-                    />
-                    <button onClick={findOrder} className="w-full rounded-2xl bg-black text-white py-5 font-extrabold shadow-lg">
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="orderNo" className="mb-1.5 block text-xs font-medium text-gray-600">
+                        Sipariş Numarası
+                      </label>
+                      <input
+                        id="orderNo"
+                        value={orderNo}
+                        onChange={(e) => setOrderNo(e.target.value)}
+                        placeholder="#1001"
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-gray-600">
+                        E-posta Adresi
+                      </label>
+                      <input
+                        id="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="siparis@email.com"
+                        type="email"
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
+                      />
+                    </div>
+                    <button
+                      onClick={findOrder}
+                      style={{ background: accentColor }}
+                      className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90"
+                    >
                       Siparişimi Bul
                     </button>
                   </div>
@@ -235,20 +252,18 @@ export default function ReturnsPage() {
 
               {step === 'order' && (
                 <>
-                  <h2 className="text-3xl md:text-4xl font-bold tracking-[-0.05em]">Sipariş Bulundu</h2>
-                  <p className="text-gray-500 mt-3 mb-8">İade etmek istediğiniz ürünü kontrol edin.</p>
+                  <h2 className="text-2xl font-bold tracking-tight">Sipariş Bulundu</h2>
+                  <p className="text-muted-foreground mt-2 mb-7 text-sm">İade etmek istediğiniz ürünleri seçin.</p>
 
-                  <div className="rounded-3xl border border-gray-100 bg-gray-50 p-6 mb-6">
-                    <p className="text-gray-500 text-sm">Sipariş</p>
-                    <h3 className="text-2xl font-bold">{order.id}</h3>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5 mb-6">
+                    <p className="text-xs text-gray-500">Sipariş No</p>
+                    <p className="font-bold text-lg mt-0.5">{order.id}</p>
 
                     <div className="mt-5">
-                      <p className="text-gray-500 text-sm mb-3">İade edilecek ürünler</p>
-
-                      <div className="space-y-3">
+                      <p className="text-xs text-gray-500 mb-3">Ürünler</p>
+                      <div className="space-y-2">
                         {order.items?.map((item: any, index: number) => {
                           const checked = selectedItems.some((x) => x.name === item.name);
-
                           return (
                             <button
                               key={index}
@@ -259,8 +274,9 @@ export default function ReturnsPage() {
                                   setSelectedItems([...selectedItems, item]);
                                 }
                               }}
-                              className={`w-full rounded-2xl border px-4 py-4 text-left font-bold ${
-                                checked ? 'border-black bg-black text-white' : 'border-gray-200 bg-white text-black'
+                              style={checked ? { borderColor: accentColor, background: accentColor } : {}}
+                              className={`w-full rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${
+                                checked ? 'text-white' : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300'
                               }`}
                             >
                               {checked ? '✓ ' : ''}
@@ -272,15 +288,16 @@ export default function ReturnsPage() {
                     </div>
 
                     <div className="mt-5">
-                      <p className="text-gray-500 text-sm">Tutar</p>
-                      <h3 className="text-xl font-bold">{order.amount}</h3>
+                      <p className="text-xs text-gray-500">Toplam Tutar</p>
+                      <p className="font-bold text-lg mt-0.5">{order.amount}</p>
                     </div>
                   </div>
 
                   <button
                     disabled={selectedItems.length === 0}
                     onClick={() => setStep('reason')}
-                    className="w-full rounded-2xl bg-black text-white py-5 font-extrabold shadow-lg disabled:opacity-30"
+                    style={{ background: accentColor }}
+                    className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-30"
                   >
                     Seçili Ürünlerle Devam Et
                   </button>
@@ -289,16 +306,17 @@ export default function ReturnsPage() {
 
               {step === 'reason' && (
                 <>
-                  <h2 className="text-3xl md:text-4xl font-bold tracking-[-0.05em]">İade Sebebi</h2>
-                  <p className="text-gray-500 mt-3 mb-8">Mağazanın talebinizi daha hızlı incelemesi için sebep seçin.</p>
+                  <h2 className="text-2xl font-bold tracking-tight">İade Sebebi</h2>
+                  <p className="text-muted-foreground mt-2 mb-7 text-sm">Mağazanın talebinizi daha hızlı incelemesi için sebep seçin.</p>
 
-                  <div className="space-y-3 mb-6">
+                  <div className="space-y-2 mb-6">
                     {['Küçük geldi', 'Büyük geldi', 'Hasarlı geldi', 'Yanlış ürün geldi', 'Diğer'].map((item) => (
                       <button
                         key={item}
                         onClick={() => setReason(item)}
-                        className={`w-full text-left rounded-2xl border px-5 py-4 font-bold ${
-                          reason === item ? 'border-black bg-black text-white' : 'border-gray-200 bg-white text-black'
+                        style={reason === item ? { borderColor: accentColor, background: accentColor } : {}}
+                        className={`w-full text-left rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                          reason === item ? 'text-white' : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300'
                         }`}
                       >
                         {item}
@@ -306,67 +324,84 @@ export default function ReturnsPage() {
                     ))}
                   </div>
 
-                  <div className="mb-6">
-                    <label className="block mb-3 font-bold">Açıklama</label>
-
+                  <div className="mb-5">
+                    <label htmlFor="description" className="block mb-1.5 text-xs font-medium text-gray-600">
+                      Açıklama <span className="text-gray-400">(isteğe bağlı)</span>
+                    </label>
                     <textarea
+                      id="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       rows={4}
                       placeholder="İade sebebini detaylı açıklayın..."
-                      className="w-full rounded-2xl border border-gray-200 p-4"
+                      className="w-full rounded-xl border border-gray-200 p-4 text-sm outline-none focus:border-gray-400 resize-none transition-colors"
                     />
                   </div>
 
                   <div className="mb-6">
-                    <label className="block mb-3 font-bold">Fotoğraf / Video Yükle</label>
-
+                    <label htmlFor="mediaFiles" className="block mb-1.5 text-xs font-medium text-gray-600">
+                      Fotoğraf / Video <span className="text-gray-400">(isteğe bağlı)</span>
+                    </label>
                     <input
+                      id="mediaFiles"
                       type="file"
                       multiple
                       accept="image/*,video/*"
                       onChange={(e) => setFiles(e.target.files)}
-                      className="w-full rounded-2xl border border-gray-200 p-4"
+                      className="w-full rounded-xl border border-gray-200 p-4 text-sm"
                     />
-
-                    <p className="mt-2 text-sm text-gray-500">JPG, PNG, WEBP, MP4, MOV desteklenir.</p>
+                    <p className="mt-1.5 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV desteklenir.</p>
                   </div>
 
                   <button
                     disabled={!reason || isSubmitting}
                     onClick={createReturnRequest}
-                    className="w-full rounded-2xl bg-black text-white py-5 font-extrabold shadow-lg disabled:opacity-30"
+                    style={{ background: accentColor }}
+                    className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-30"
                   >
-                    {isSubmitting ? 'Dosyalar yükleniyor...' : 'İade Talebi Oluştur'}
+                    {isSubmitting ? 'Yükleniyor...' : 'İade Talebi Oluştur'}
                   </button>
                 </>
               )}
 
               {step === 'success' && (
-                <div className="text-center py-10">
-                  <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-black text-white text-3xl">
+                <div className="flex flex-col items-center py-8 text-center">
+                  <div
+                    style={{ background: accentColor }}
+                    className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full text-white text-2xl"
+                  >
                     ✓
                   </div>
 
-                  <h2 className="text-3xl md:text-4xl font-bold tracking-[-0.05em]">Talebiniz Alındı</h2>
+                  <h2 className="text-2xl font-bold tracking-tight">Talebiniz Alındı</h2>
+                  <p className="text-gray-500 mt-3 text-sm leading-6 max-w-xs">
+                    İade talebiniz mağazaya iletildi. İnceleme sonrası size bilgi verilecektir.
+                  </p>
 
-                  <p className="text-gray-500 mt-4 leading-7">İade talebiniz mağazaya iletildi. İnceleme sonrası size bilgi verilecektir.</p>
-
-                  <div className="mt-8 rounded-3xl bg-gray-50 border border-gray-100 p-5 text-left">
-                    <p className="text-gray-500 text-sm">Talep No</p>
-                    <h3 className="text-2xl font-bold">{createdRfNumber}</h3>
-                    <p className="mt-4 text-sm text-gray-500">
-                      Talebinizi takip etmek için İade Takibi sayfasına gidip bu RF numarasını veya sipariş numaranızı kullanabilirsiniz.
+                  <div className="mt-8 w-full rounded-2xl bg-gray-50 border border-gray-100 p-5 text-left">
+                    <p className="text-xs text-gray-500">Talep No</p>
+                    <p className="text-2xl font-bold mt-0.5">{createdRfNumber}</p>
+                    <p className="mt-3 text-xs text-gray-500 leading-5">
+                      Talebinizi takip etmek için İade Takibi sayfasını ziyaret edebilirsiniz.
                     </p>
-
-                    <a href="/track" className="mt-4 inline-flex rounded-2xl bg-black px-5 py-3 font-bold text-white">
+                    <a
+                      href="/track"
+                      style={{ background: accentColor }}
+                      className="mt-4 inline-flex rounded-xl px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity"
+                    >
                       İade Takibine Git
                     </a>
-                    <p className="text-gray-500 text-sm mt-5">Durum</p>
-                    <h3 className="text-xl font-bold">İncelemede</h3>
 
-                    <p className="text-gray-500 text-sm mt-5">Sebep</p>
-                    <h3 className="text-xl font-bold">{reason}</h3>
+                    <div className="mt-5 grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-500">Durum</p>
+                        <p className="font-semibold text-sm mt-0.5">İncelemede</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Sebep</p>
+                        <p className="font-semibold text-sm mt-0.5">{reason}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
