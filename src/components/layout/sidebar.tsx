@@ -4,10 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { ArrowLeftRight, BarChart2, ChevronLeft, ChevronRight, LayoutList, Settings } from 'lucide-react';
+import { ArrowLeftRight, BarChart2, ChevronLeft, ChevronRight, LayoutDashboard, LayoutList, Settings } from 'lucide-react';
 
 const NAV = [
-  { href: '/dashboard', label: 'İade Talepleri', icon: LayoutList, exact: true },
+  { href: '/dashboard', label: 'Genel Bakış', icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/returns-management', label: 'İade Yönetimi', icon: LayoutList, exact: false },
   { href: '/dashboard/analytics', label: 'Analiz', icon: BarChart2, exact: false },
   { href: '/dashboard/settings', label: 'Ayarlar', icon: Settings, exact: false },
 ];
