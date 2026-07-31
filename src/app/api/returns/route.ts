@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
 
 // ── POST: create a new return (public — called from customer portal) ────────
 export async function POST(request: NextRequest) {
+  // DIAGNOSTIC SENTINEL — remove after confirming route is reached
+  return NextResponse.json({ route: '/api/returns', reached: true }, { status: 200 });
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
