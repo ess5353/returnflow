@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     media_urls: media_urls ?? [],
   };
 
-  console.error('[returns POST] INSERT payload:', JSON.stringify({ ...insertPayload, products: '(omitted)' }));
+  console.error('[returns POST] COMPLETE insertPayload:', JSON.stringify(insertPayload));
 
   const { data: inserted, error: insertError } = await supabaseAdmin
     .from('return_requests')
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create return' }, { status: 500 });
   }
 
-  console.error('[returns POST] INSERT result merchant_id:', inserted?.merchant_id);
+  console.error('[returns POST] COMPLETE inserted row:', JSON.stringify(inserted));
 
   return NextResponse.json({ data: inserted });
 }
