@@ -4,6 +4,7 @@ import { getIkas } from '@/helpers/api-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export type PublicStoreSettings = {
+  merchant_id: string;
   store_name: string | null;
   logo_url: string | null;
   primary_color: string | null;
@@ -30,7 +31,7 @@ export async function GET() {
 
     const { data, error } = await supabaseAdmin
       .from('store_settings')
-      .select('store_name, logo_url, primary_color, support_email, return_policy')
+      .select('merchant_id, store_name, logo_url, primary_color, support_email, return_policy')
       .eq('merchant_id', merchantId)
       .maybeSingle();
 

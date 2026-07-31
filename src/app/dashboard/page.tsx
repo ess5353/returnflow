@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
@@ -53,6 +52,7 @@ const STATUS_FILTERS = ['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'] as c
 const PORTAL_URL = 'https://returnflow-git-main-ess7.vercel.app/returns';
 
 export default function DashboardPage() {
+  const [token, setToken] = useState<string | null>(null);
   const [requests, setRequests] = useState<ReturnRequest[]>([]);
   const [orders, setOrders] = useState<IkasOrder[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
@@ -66,87 +66,83 @@ export default function DashboardPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const { settings, loadSettings: fetchSettings } = useStoreSettings();
 
-  const fetchRequests = async () => {
-    const { data, error } = await supabase.from('return_requests').select('*').order('created_at', { ascending: false });
-
-    if (error) {
-      console.error(error);
+  const fetchRequests = useCallback(async (t: string) => {
+    const res = await fetch('/api/returns', { headers: { Authorization: `JWT ${t}` } });
+    if (!res.ok) {
       toast('İade talepleri alınamadı', 'error');
       setLoading(false);
       return;
     }
-
-    setRequests(data || []);
-    setSelectedRequest((current) => current ?? data?.[0] ?? null);
+    const { data } = await res.json();
+    const list = (data as ReturnRequest[]) ?? [];
+    setRequests(list);
+    setSelectedRequest((current) => current ?? list[0] ?? null);
     setLoading(false);
-  };
+  }, []);
 
-  const fetchOrders = async () => {
-    const token = await TokenHelpers.getTokenForIframeApp();
-    const response = await fetch('/api/ikas/orders', { headers: { Authorization: `JWT ${token}` } });
-    const data = await response.json();
+  const fetchOrders = useCallback(async (t: string) => {
+    const res = await fetch('/api/ikas/orders', { headers: { Authorization: `JWT ${t}` } });
+    const data = await res.json();
     if (data.success) setOrders(data.orders);
-  };
+  }, []);
 
   useEffect(() => {
     AppBridgeHelper.closeLoader();
   }, []);
 
   useEffect(() => {
-    fetchRequests();
-    fetchOrders();
-    fetchSettings();
+    const init = async () => {
+      const t = await TokenHelpers.getTokenForIframeApp();
+      setToken(t);
+      if (t) {
+        await Promise.all([fetchRequests(t), fetchOrders(t), fetchSettings()]);
+      }
+    };
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const updateStatus = async (status: string) => {
-    if (!selectedRequest) return;
+  const updateStatus = useCallback(async (status: string) => {
+    if (!selectedRequest || !token) return;
     setUpdatingStatus(true);
-    const { error } = await supabase.from('return_requests').update({ status }).eq('id', selectedRequest.id);
+    const res = await fetch(`/api/returns/${selectedRequest.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ status }),
+    });
     setUpdatingStatus(false);
-
-    if (error) {
-      console.error(error);
-      toast('Durum güncellenemedi', 'error');
-      return;
-    }
-
-    await fetchRequests();
-    setSelectedRequest({ ...selectedRequest, status });
+    if (!res.ok) { toast('Durum güncellenemedi', 'error'); return; }
+    await fetchRequests(token);
+    setSelectedRequest((prev) => prev ? { ...prev, status } : prev);
     toast(status === 'Onaylandı' ? 'Talep onaylandı' : 'Talep reddedildi', 'success');
-  };
+  }, [selectedRequest, token, fetchRequests]);
 
-  const saveNote = async () => {
-    if (!selectedRequest) return;
+  const saveNote = useCallback(async () => {
+    if (!selectedRequest || !token) return;
     setSavingNote(true);
-    const { error } = await supabase.from('return_requests').update({ admin_note: adminNote }).eq('id', selectedRequest.id);
+    const res = await fetch(`/api/returns/${selectedRequest.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ admin_note: adminNote }),
+    });
     setSavingNote(false);
-
-    if (error) {
-      console.error(error);
-      toast('Not kaydedilemedi', 'error');
-      return;
-    }
-
-    await fetchRequests();
+    if (!res.ok) { toast('Not kaydedilemedi', 'error'); return; }
+    await fetchRequests(token);
     toast('Not kaydedildi', 'success');
-  };
+  }, [selectedRequest, token, adminNote, fetchRequests]);
 
-  const handleDelete = async () => {
-    if (!selectedRequest) return;
-    const { error } = await supabase.from('return_requests').delete().eq('id', selectedRequest.id);
-
-    if (error) {
-      console.error(error);
-      toast('Talep silinemedi', 'error');
-      return;
-    }
-
+  const handleDelete = useCallback(async () => {
+    if (!selectedRequest || !token) return;
+    const res = await fetch(`/api/returns/${selectedRequest.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `JWT ${token}` },
+    });
+    if (!res.ok) { toast('Talep silinemedi', 'error'); return; }
     setDeleteDialogOpen(false);
     setSelectedRequest(null);
-    await fetchRequests();
+    await fetchRequests(token);
     toast('Talep silindi', 'success');
-  };
+  }, [selectedRequest, token, fetchRequests]);
 
   const filteredRequests = requests.filter((r) => {
     const matchesFilter = filter === 'Tümü' || r.status === filter;
@@ -159,25 +155,16 @@ export default function DashboardPage() {
     const createdAt = new Date(r.created_at);
     const now = new Date();
     let matchesDate = true;
-
     if (dateFilter === 'Bugün') matchesDate = createdAt.toDateString() === now.toDateString();
-    if (dateFilter === 'Son 7 Gün') matchesDate = createdAt >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    if (dateFilter === 'Son 30 Gün') matchesDate = createdAt >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (dateFilter === 'Son 7 Gün') matchesDate = createdAt >= new Date(now.getTime() - 7 * 86400000);
+    if (dateFilter === 'Son 30 Gün') matchesDate = createdAt >= new Date(now.getTime() - 30 * 86400000);
     if (dateFilter === 'Bu Ay') matchesDate = createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
 
     return matchesFilter && matchesSearch && matchesDate;
   });
 
   const totalReturnAmount = filteredRequests.reduce((t, r) => t + Number(r.amount || 0), 0);
-
-  const reasonCounts = filteredRequests.reduce(
-    (acc: Record<string, number>, r) => {
-      acc[r.reason] = (acc[r.reason] || 0) + 1;
-      return acc;
-    },
-    {},
-  );
-
+  const reasonCounts = filteredRequests.reduce((acc: Record<string, number>, r) => { acc[r.reason] = (acc[r.reason] || 0) + 1; return acc; }, {});
   const topReason = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0];
   const reasonStats = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
@@ -198,18 +185,13 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">İade Talepleri</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Genel Bakış</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">Müşterilerden gelen iade taleplerini buradan yönetin.</p>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              setLoading(true);
-              fetchRequests();
-              fetchOrders();
-              fetchSettings();
-            }}
+            onClick={() => { if (token) { setLoading(true); fetchRequests(token); fetchOrders(token); } fetchSettings(); }}
             className="shrink-0 gap-2"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -252,10 +234,7 @@ export default function DashboardPage() {
               size="sm"
               variant="outline"
               className="shrink-0 gap-1.5"
-              onClick={() => {
-                navigator.clipboard.writeText(PORTAL_URL);
-                toast('Portal linki kopyalandı', 'success');
-              }}
+              onClick={() => { navigator.clipboard.writeText(PORTAL_URL); toast('Portal linki kopyalandı', 'success'); }}
             >
               <Copy className="h-3.5 w-3.5" />
               Kopyala
@@ -281,9 +260,7 @@ export default function DashboardPage() {
                       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                         <div
                           className="h-full rounded-full bg-primary transition-all"
-                          style={{
-                            width: `${filteredRequests.length ? Math.min((count / filteredRequests.length) * 100, 100) : 0}%`,
-                          }}
+                          style={{ width: `${filteredRequests.length ? Math.min((count / filteredRequests.length) * 100, 100) : 0}%` }}
                         />
                       </div>
                     </div>
@@ -292,7 +269,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Return requests */}
+            {/* Return requests table */}
             <div className="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
               <div className="border-b border-border p-4">
                 <h2 className="text-sm font-semibold">İade Talepleri</h2>
@@ -340,13 +317,8 @@ export default function DashboardPage() {
                     return (
                       <button
                         key={req.id}
-                        onClick={() => {
-                          setSelectedRequest(req);
-                          setAdminNote(req.admin_note || '');
-                        }}
-                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
-                          isSelected ? 'bg-muted/50' : ''
-                        }`}
+                        onClick={() => { setSelectedRequest(req); setAdminNote(req.admin_note || ''); }}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${isSelected ? 'bg-muted/50' : ''}`}
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
@@ -379,9 +351,7 @@ export default function DashboardPage() {
                   {orders.map((order) => (
                     <div key={order.id} className="flex items-center gap-4 px-4 py-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium truncate">
-                          #{order.orderNumber} · {order.customerName}
-                        </p>
+                        <p className="text-xs font-medium truncate">#{order.orderNumber} · {order.customerName}</p>
                         <p className="text-xs text-muted-foreground truncate">{order.items?.[0]?.name || '—'}</p>
                       </div>
                       <div className="shrink-0 text-right">
@@ -404,7 +374,6 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div>
-                {/* Panel header */}
                 <div className="border-b border-border p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -415,9 +384,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Panel body */}
                 <div className="p-4 space-y-4 text-sm">
-                  {/* Info grid */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-muted-foreground">Sipariş</p>
@@ -437,7 +404,6 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Products */}
                   {selected.products && selected.products.length > 0 ? (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-2">İade Edilen Ürünler</p>
@@ -445,9 +411,7 @@ export default function DashboardPage() {
                         {selected.products.map((item, i) => (
                           <div key={i} className="rounded-lg bg-muted px-3 py-2">
                             <p className="text-xs font-medium">{item.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {item.quantity} adet · ₺{item.price}
-                            </p>
+                            <p className="text-xs text-muted-foreground">{item.quantity} adet · ₺{item.price}</p>
                           </div>
                         ))}
                       </div>
@@ -459,7 +423,6 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Description */}
                   {selected.description && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">Açıklama</p>
@@ -467,13 +430,12 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Media */}
                   {selected.media_urls && selected.media_urls.length > 0 && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-2">Kanıt Dosyaları</p>
                       <div className="grid grid-cols-2 gap-2">
                         {selected.media_urls.map((url, i) => {
-                          const isVideo = /\.(mp4|mov|webm)/.test(url);
+                          const isVideo = /\.(mp4|mov|webm)/i.test(url);
                           return isVideo ? (
                             <video key={i} controls className="w-full rounded-lg border border-border">
                               <source src={url} />
@@ -486,22 +448,14 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Admin note */}
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1.5">Mağaza Notu</p>
-                    <Textarea
-                      value={adminNote}
-                      onChange={(e) => setAdminNote(e.target.value)}
-                      rows={3}
-                      placeholder="Not bırak..."
-                      className="text-xs"
-                    />
+                    <Textarea value={adminNote} onChange={(e) => setAdminNote(e.target.value)} rows={3} placeholder="Not bırak..." className="text-xs" />
                     <Button variant="outline" size="sm" onClick={saveNote} disabled={savingNote} className="mt-2 w-full text-xs">
                       {savingNote ? 'Kaydediliyor...' : 'Notu Kaydet'}
                     </Button>
                   </div>
 
-                  {/* Actions */}
                   <div className="space-y-2 pt-2 border-t border-border">
                     <Button
                       size="sm"
@@ -546,18 +500,13 @@ export default function DashboardPage() {
           <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <Dialog.Title className="text-base font-bold">Talebi Sil</Dialog.Title>
             <Dialog.Description className="mt-2 text-sm text-muted-foreground">
-              <strong className="text-foreground">{selected?.rf_number}</strong> numaralı iade talebi kalıcı olarak silinecek. Bu işlem geri
-              alınamaz.
+              <strong className="text-foreground">{selected?.rf_number}</strong> numaralı iade talebi kalıcı olarak silinecek.
             </Dialog.Description>
             <div className="mt-5 flex gap-2">
               <Dialog.Close asChild>
-                <Button variant="outline" className="flex-1">
-                  İptal
-                </Button>
+                <Button variant="outline" className="flex-1">İptal</Button>
               </Dialog.Close>
-              <Button variant="destructive" className="flex-1" onClick={handleDelete}>
-                Sil
-              </Button>
+              <Button variant="destructive" className="flex-1" onClick={handleDelete}>Sil</Button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>

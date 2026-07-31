@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { supabase } from '@/lib/supabase';
+import { TokenHelpers } from '@/helpers/token-helpers';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
@@ -222,18 +222,20 @@ export default function ReturnsManagementPage() {
   const [bulkNoteLoading, setBulkNoteLoading] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
+  const [token, setToken] = useState<string | null>(null);
   const { settings, loadSettings } = useStoreSettings();
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const fetchRows = useCallback(async () => {
+  const fetchRows = useCallback(async (t: string) => {
     setError(null);
-    const { data, error: err } = await supabase.from('return_requests').select('*').order('created_at', { ascending: false });
-    if (err) {
+    const res = await fetch('/api/returns', { headers: { Authorization: `JWT ${t}` } });
+    if (!res.ok) {
       setError('İade talepleri alınamadı. Lütfen tekrar deneyin.');
       setLoading(false);
       return;
     }
+    const { data } = await res.json();
     const fresh = (data as ReturnRow[]) || [];
     setRows(fresh);
     setDrawerRow((prev) => (prev ? (fresh.find((r) => r.id === prev.id) ?? null) : null));
@@ -245,8 +247,13 @@ export default function ReturnsManagementPage() {
   }, []);
 
   useEffect(() => {
-    fetchRows();
-    loadSettings();
+    const init = async () => {
+      const t = await TokenHelpers.getTokenForIframeApp();
+      setToken(t);
+      if (t) await fetchRows(t);
+      await loadSettings();
+    };
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -327,47 +334,64 @@ export default function ReturnsManagementPage() {
   const closeDrawer = () => setDrawerOpen(false);
 
   const updateStatus = async (id: string, status: string) => {
+    if (!token) return;
     setUpdatingStatus(true);
-    const { error: err } = await supabase.from('return_requests').update({ status }).eq('id', id);
+    const res = await fetch(`/api/returns/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ status }),
+    });
     setUpdatingStatus(false);
-    if (err) { toast('Durum güncellenemedi', 'error'); return; }
-    await fetchRows();
+    if (!res.ok) { toast('Durum güncellenemedi', 'error'); return; }
+    await fetchRows(token);
     toast(status === 'Onaylandı' ? 'Talep onaylandı' : 'Talep reddedildi', 'success');
   };
 
   const saveNote = async () => {
-    if (!drawerRow) return;
+    if (!drawerRow || !token) return;
     setSavingNote(true);
-    const { error: err } = await supabase.from('return_requests').update({ admin_note: adminNote }).eq('id', drawerRow.id);
+    const res = await fetch(`/api/returns/${drawerRow.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ admin_note: adminNote }),
+    });
     setSavingNote(false);
-    if (err) { toast('Not kaydedilemedi', 'error'); return; }
-    await fetchRows();
+    if (!res.ok) { toast('Not kaydedilemedi', 'error'); return; }
+    await fetchRows(token);
     toast('Not kaydedildi', 'success');
   };
 
   const bulkUpdateStatus = async (status: string) => {
-    if (!selected.size) return;
+    if (!selected.size || !token) return;
     setBulkActionLoading(true);
     const ids = Array.from(selected);
-    const { error: err } = await supabase.from('return_requests').update({ status }).in('id', ids);
+    const res = await fetch('/api/returns/bulk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ ids, status }),
+    });
     setBulkActionLoading(false);
-    if (err) { toast('Toplu durum güncellenemedi', 'error'); return; }
+    if (!res.ok) { toast('Toplu durum güncellenemedi', 'error'); return; }
     setSelected(new Set());
-    await fetchRows();
+    await fetchRows(token);
     toast(`${ids.length} talep güncellendi`, 'success');
   };
 
   const bulkSaveNote = async () => {
-    if (!selected.size || !bulkNote.trim()) return;
+    if (!selected.size || !bulkNote.trim() || !token) return;
     setBulkNoteLoading(true);
     const ids = Array.from(selected);
-    const { error: err } = await supabase.from('return_requests').update({ admin_note: bulkNote }).in('id', ids);
+    const res = await fetch('/api/returns/bulk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ ids, admin_note: bulkNote }),
+    });
     setBulkNoteLoading(false);
-    if (err) { toast('Toplu not kaydedilemedi', 'error'); return; }
+    if (!res.ok) { toast('Toplu not kaydedilemedi', 'error'); return; }
     setBulkNoteOpen(false);
     setBulkNote('');
     setSelected(new Set());
-    await fetchRows();
+    await fetchRows(token);
     toast(`${ids.length} talebe not eklendi`, 'success');
   };
 
@@ -391,7 +415,7 @@ export default function ReturnsManagementPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { setLoading(true); fetchRows(); }}
+                onClick={() => { if (token) { setLoading(true); fetchRows(token); } }}
                 className="shrink-0 gap-2"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -524,7 +548,7 @@ export default function ReturnsManagementPage() {
                           <div className="flex flex-col items-center gap-3">
                             <FileX className="h-8 w-8 text-muted-foreground/40" />
                             <p className="text-sm text-muted-foreground">{error}</p>
-                            <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchRows(); }}>Tekrar Dene</Button>
+                            <Button variant="outline" size="sm" onClick={() => { if (token) { setLoading(true); fetchRows(token); } }}>Tekrar Dene</Button>
                           </div>
                         </td>
                       </tr>

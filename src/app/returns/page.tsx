@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { TokenHelpers } from '@/helpers/token-helpers';
 import { toast } from '@/components/ui/toast';
 import type { PublicStoreSettings } from '@/app/api/store-settings/route';
 
@@ -31,83 +30,65 @@ export default function ReturnsPage() {
   const createReturnRequest = async () => {
     setIsSubmitting(true);
 
-    let uploadedUrls: string[] = [];
-
+    // Upload files to Supabase Storage (storage bucket uses anon key — unchanged)
+    const uploadedUrls: string[] = [];
     if (files) {
       for (const file of Array.from(files)) {
         const extension = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extension}`;
-
         const { error: uploadError } = await supabase.storage.from('return-files').upload(fileName, file);
-
         if (uploadError) {
           console.error('Dosya yüklenemedi:', uploadError);
           setIsSubmitting(false);
           toast('Dosya yüklenemedi', 'error');
           return;
         }
-
         const { data } = supabase.storage.from('return-files').getPublicUrl(fileName);
         uploadedUrls.push(data.publicUrl);
       }
     }
 
-    const now = new Date();
-    const datePart = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-
-    const { count, error: countError } = await supabase
-      .from('return_requests')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', startOfDay);
-
-    if (countError) {
-      console.error(countError);
-      setIsSubmitting(false);
-      toast('RF numarası oluşturulamadı', 'error');
-      return;
-    }
-
-    const sequence = String((count || 0) + 1).padStart(4, '0');
-    const rfNumber = `RF-${datePart}-${sequence}`;
-
-    const { error } = await supabase.from('return_requests').insert([
-      {
-        rf_number: rfNumber,
+    // Submit return via server-side API (service role, merchant-scoped)
+    const res = await fetch('/api/returns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchant_id: settings?.merchant_id,
         order_id: order.order_no,
         customer_name: order.customer_name,
         customer_email: email,
         product: selectedItems.map((item) => item.name).join(', '),
+        products: selectedItems.map((item) => ({ name: item.name, quantity: item.quantity, price: item.price })),
         reason,
-        products: selectedItems.map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-        })),
         description,
-        amount: String(selectedItems.reduce((total, item) => total + Number(item.price || 0), 0)),
-        status: 'Yeni Talep',
+        amount: selectedItems.reduce((total, item) => total + Number(item.price || 0), 0),
         media_urls: uploadedUrls,
-      },
-    ]);
+      }),
+    });
 
-    if (error) {
-      console.error(error);
+    const result = await res.json();
+
+    if (!res.ok || !result.data) {
       setIsSubmitting(false);
       toast('Kayıt sırasında hata oluştu', 'error');
       return;
     }
 
-    await fetch('/api/email/return-created', {
+    const rfNumber: string = result.data.rf_number;
+
+    // Fire automation evaluation (best-effort — do not block success screen)
+    fetch('/api/automation/evaluate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        customerName: order.customer_name,
-        rfNumber,
-        orderNo: order.order_no,
-      }),
-    });
+      body: JSON.stringify({ return_id: result.data.id }),
+    }).catch(() => {});
+
+    // Send notification email (best-effort)
+    fetch('/api/email/return-created', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, customerName: order.customer_name, rfNumber, orderNo: order.order_no }),
+    }).catch(() => {});
 
     setCreatedRfNumber(rfNumber);
     setIsSubmitting(false);
@@ -115,17 +96,14 @@ export default function ReturnsPage() {
   };
 
   const findOrder = async () => {
-    const existingRequest = await supabase.from('return_requests').select('id').eq('order_id', orderNo);
-
-    if (existingRequest.data && existingRequest.data.length > 0) {
-      toast('Bu sipariş için zaten iade talebi oluşturulmuş.', 'error');
+    if (!settings?.merchant_id) {
+      toast('Mağaza bilgisi yüklenemedi', 'error');
       return;
     }
 
-    const token = await TokenHelpers.getTokenForIframeApp();
+    // Duplicate check is now server-side; just look up the order
     const url = `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}&email=${encodeURIComponent(email)}`;
-
-    const response = await fetch(url, { headers: { Authorization: `JWT ${token}` } });
+    const response = await fetch(url);
     const result = await response.json();
 
     if (!result.success) {
@@ -138,7 +116,6 @@ export default function ReturnsPage() {
   };
 
   const accentColor = settings?.primary_color || '#000000';
-
   const STEPS = ['Sipariş Bul', 'Ürün Seç', 'Sebep Gir'] as const;
   const stepIndex = step === 'search' ? 0 : step === 'order' ? 1 : step === 'reason' ? 2 : 3;
 
@@ -153,7 +130,6 @@ export default function ReturnsPage() {
               <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-white/5" />
 
               <div className="relative z-10">
-                {/* Branding */}
                 <div className="mb-8 flex items-center gap-3">
                   {settings?.logo_url && (
                     <img src={settings.logo_url} alt="Logo" className="h-12 w-12 rounded-xl bg-white object-contain p-2 border border-white/20" />
@@ -180,18 +156,13 @@ export default function ReturnsPage() {
                   </div>
                 )}
 
-                {/* Steps indicator */}
                 {step !== 'success' && (
                   <div className="mt-10 space-y-3">
                     {STEPS.map((label, i) => (
                       <div key={label} className="flex items-center gap-3">
                         <div
                           className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
-                            i < stepIndex
-                              ? 'bg-white text-black'
-                              : i === stepIndex
-                                ? 'bg-white text-black'
-                                : 'bg-white/20 text-white/60'
+                            i < stepIndex ? 'bg-white text-black' : i === stepIndex ? 'bg-white text-black' : 'bg-white/20 text-white/60'
                           }`}
                         >
                           {i < stepIndex ? '✓' : i + 1}
@@ -267,13 +238,9 @@ export default function ReturnsPage() {
                           return (
                             <button
                               key={index}
-                              onClick={() => {
-                                if (checked) {
-                                  setSelectedItems(selectedItems.filter((x) => x.name !== item.name));
-                                } else {
-                                  setSelectedItems([...selectedItems, item]);
-                                }
-                              }}
+                              onClick={() =>
+                                checked ? setSelectedItems(selectedItems.filter((x) => x.name !== item.name)) : setSelectedItems([...selectedItems, item])
+                              }
                               style={checked ? { borderColor: accentColor, background: accentColor } : {}}
                               className={`w-full rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${
                                 checked ? 'text-white' : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300'
