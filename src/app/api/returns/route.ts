@@ -1,6 +1,8 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
+import { AuthTokenManager } from '@/models/auth-token/manager';
+import { getIkas } from '@/helpers/api-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // ── GET: list all returns for the authenticated merchant ───────────────────
@@ -31,8 +33,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { merchant_id, order_id, customer_name, customer_email, product, products, reason, description, amount, media_urls } = body as {
-    merchant_id: string;
+  const { order_id, customer_name, customer_email, product, products, reason, description, amount, media_urls } = body as {
     order_id: string;
     customer_name: string;
     customer_email?: string;
@@ -44,20 +45,43 @@ export async function POST(request: NextRequest) {
     media_urls?: string[];
   };
 
-  if (!merchant_id || !order_id || !reason) {
+  console.error('[returns POST] body keys:', Object.keys(body));
+  console.error('[returns POST] body.merchant_id from client:', JSON.stringify((body as Record<string, unknown>).merchant_id));
+
+  if (!order_id || !reason) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  // Validate merchant exists
-  const { data: merchantRow } = await supabaseAdmin
-    .from('store_settings')
-    .select('merchant_id')
-    .eq('merchant_id', merchant_id)
-    .maybeSingle();
+  // Derive merchant_id server-side from the stored auth token — never trust the client.
+  const tokens = await AuthTokenManager.list();
+  console.error('[returns POST] auth_tokens count:', tokens.length);
+  console.error('[returns POST] token merchantIds:', tokens.map((t) => ({ id: t.id, merchantId: t.merchantId, deleted: t.deleted })));
 
-  if (!merchantRow) {
-    return NextResponse.json({ error: 'Invalid merchant' }, { status: 400 });
+  const activeToken = tokens.find((t) => !t.deleted);
+
+  if (!activeToken) {
+    console.error('[returns POST] No active token found');
+    return NextResponse.json({ error: 'Store not configured' }, { status: 503 });
   }
+
+  console.error('[returns POST] activeToken.merchantId:', JSON.stringify(activeToken.merchantId));
+
+  // Prefer merchantId from the token directly; fall back to ikas API if empty.
+  let merchant_id: string = activeToken.merchantId ?? '';
+  if (!merchant_id) {
+    console.error('[returns POST] merchantId empty in token, calling ikas API fallback');
+    const ikas = getIkas(activeToken);
+    const merchantResponse = await ikas.queries.getMerchant();
+    merchant_id = merchantResponse.data?.getMerchant?.id ?? '';
+    console.error('[returns POST] ikas getMerchant result:', merchant_id);
+  }
+
+  if (!merchant_id) {
+    console.error('[returns POST] merchant_id still empty after all fallbacks — aborting');
+    return NextResponse.json({ error: 'Merchant not found' }, { status: 500 });
+  }
+
+  console.error('[returns POST] final merchant_id before INSERT:', merchant_id);
 
   // Check for duplicate (one return per order per merchant)
   const { data: existing } = await supabaseAdmin
@@ -84,31 +108,35 @@ export async function POST(request: NextRequest) {
   const sequence = String((count ?? 0) + 1).padStart(4, '0');
   const rf_number = `RF-${datePart}-${sequence}`;
 
+  const insertPayload = {
+    merchant_id,
+    rf_number,
+    order_id: String(order_id),
+    customer_name,
+    customer_email: customer_email ?? null,
+    product: product ?? '',
+    products: products ?? null,
+    reason,
+    description: description ?? null,
+    amount: String(amount),
+    status: 'Yeni Talep',
+    media_urls: media_urls ?? [],
+  };
+
+  console.error('[returns POST] INSERT payload:', JSON.stringify({ ...insertPayload, products: '(omitted)' }));
+
   const { data: inserted, error: insertError } = await supabaseAdmin
     .from('return_requests')
-    .insert([
-      {
-        merchant_id,
-        rf_number,
-        order_id: String(order_id),
-        customer_name,
-        customer_email: customer_email ?? null,
-        product: product ?? '',
-        products: products ?? null,
-        reason,
-        description: description ?? null,
-        amount: String(amount),
-        status: 'Yeni Talep',
-        media_urls: media_urls ?? [],
-      },
-    ])
+    .insert([insertPayload])
     .select()
     .single();
 
   if (insertError) {
-    console.error('return insert error:', insertError);
+    console.error('[returns POST] INSERT error:', insertError);
     return NextResponse.json({ error: 'Failed to create return' }, { status: 500 });
   }
+
+  console.error('[returns POST] INSERT result merchant_id:', inserted?.merchant_id);
 
   return NextResponse.json({ data: inserted });
 }

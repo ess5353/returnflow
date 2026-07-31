@@ -53,7 +53,6 @@ export default function ReturnsPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        merchant_id: settings?.merchant_id,
         order_id: order.order_no,
         customer_name: order.customer_name,
         customer_email: email,

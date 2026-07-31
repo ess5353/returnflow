@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { supabase } from '@/lib/supabase';
+import { TokenHelpers } from '@/helpers/token-helpers';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -169,6 +169,7 @@ export default function AnalyticsPage() {
   const [rows, setRows] = useState<ReturnRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
   const [rangeFilter, setRangeFilter] = useState<RangeFilter>('30d');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -178,25 +179,23 @@ export default function AnalyticsPage() {
   useEffect(() => {
     AppBridgeHelper.closeLoader();
     setMounted(true);
+    TokenHelpers.getTokenForIframeApp().then(setToken);
   }, []);
 
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
 
-  const loadData = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('return_requests')
-      .select('id, status, reason, amount, created_at, products')
-      .order('created_at', { ascending: true });
-
-    if (!error && data) setRows(data as ReturnRow[]);
+  const loadData = useCallback(async (t: string) => {
+    const res = await fetch('/api/returns', { headers: { Authorization: `JWT ${t}` } });
+    const result = await res.json();
+    if (result.data) setRows(result.data as ReturnRow[]);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (token) loadData(token);
+  }, [token, loadData]);
 
   // Update grouping automatically when range filter changes
   useEffect(() => {

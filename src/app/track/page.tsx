@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import type { PublicStoreSettings } from '@/app/api/store-settings/route';
 import { ArrowLeftRight, Check, Clock, X } from 'lucide-react';
 
@@ -45,18 +44,12 @@ export default function TrackPage() {
   }, []);
 
   const searchRequest = async () => {
-    const { data, error } = await supabase
-      .from('return_requests')
-      .select('*')
-      .or(`order_id.eq.${trackingId},rf_number.eq.${trackingId}`)
-      .eq('customer_email', email);
+    const params = new URLSearchParams({ q: trackingId.trim(), email: email.trim() });
+    const res = await fetch(`/api/track?${params.toString()}`);
+    const result = await res.json();
 
-    if (error) {
-      console.error(error);
-    }
-
-    if (data && data.length > 0) {
-      setRequest(data[0] as ReturnRequest);
+    if (result.data && result.data.length > 0) {
+      setRequest(result.data[0] as ReturnRequest);
       setNotFound(false);
     } else {
       setRequest(null);

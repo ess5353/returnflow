@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
 
 export type StoreSettings = {
@@ -21,22 +20,14 @@ export function useStoreSettings() {
   const loadSettings = useCallback(async () => {
     try {
       const token = await TokenHelpers.getTokenForIframeApp();
-      const response = await fetch('/api/ikas/get-merchant', {
+      if (!token) return;
+
+      const res = await fetch('/api/settings', {
         headers: { Authorization: `JWT ${token}` },
       });
-      const result = await response.json();
-
-      const merchantId = result?.data?.merchantInfo?.id as string | undefined;
-      if (!merchantId) return;
-
-      const { data } = await supabase
-        .from('store_settings')
-        .select('*')
-        .eq('merchant_id', merchantId)
-        .maybeSingle();
-
-      if (data) {
-        setSettings(data as StoreSettings);
+      const result = await res.json();
+      if (result.data) {
+        setSettings(result.data as StoreSettings);
       }
     } catch (err) {
       console.error('Settings yüklenemedi:', err);

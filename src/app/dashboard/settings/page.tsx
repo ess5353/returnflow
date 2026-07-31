@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { supabase } from '@/lib/supabase';
 import { TokenHelpers } from '@/helpers/token-helpers';
@@ -15,6 +15,7 @@ import { Upload } from 'lucide-react';
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [merchantId, setMerchantId] = useState('');
   const [storeName, setStoreName] = useState('');
@@ -25,66 +26,50 @@ export default function SettingsPage() {
   const [returnAddress, setReturnAddress] = useState('');
   const [returnPolicy, setReturnPolicy] = useState('');
 
-  const getMerchantId = async () => {
-    const token = await TokenHelpers.getTokenForIframeApp();
-    const response = await fetch('/api/ikas/get-merchant', { headers: { Authorization: `JWT ${token}` } });
-    const result = await response.json();
-    const id = result?.data?.merchantInfo?.id;
-    if (!id) {
-      console.error('Merchant ID alınamadı:', result);
-      return '';
-    }
-    return id as string;
-  };
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async (t: string) => {
     try {
-      const id = await getMerchantId();
-      if (!id) {
-        setLoading(false);
-        return;
+      const res = await fetch('/api/settings', { headers: { Authorization: `JWT ${t}` } });
+      const result = await res.json();
+      if (result.data) {
+        const d = result.data;
+        setMerchantId(d.merchant_id || '');
+        setStoreName(d.store_name || '');
+        setNotificationEmail(d.notification_email || '');
+        setSupportEmail(d.support_email || '');
+        setLogoUrl(d.logo_url || '');
+        setPrimaryColor(d.primary_color || '#000000');
+        setReturnAddress(d.return_address || '');
+        setReturnPolicy(d.return_policy || '');
       }
-      setMerchantId(id);
-      const { data } = await supabase.from('store_settings').select('*').eq('merchant_id', id).maybeSingle();
-      if (data) {
-        setStoreName(data.store_name || '');
-        setNotificationEmail(data.notification_email || '');
-        setSupportEmail(data.support_email || '');
-        setLogoUrl(data.logo_url || '');
-        setPrimaryColor(data.primary_color || '#000000');
-        setReturnAddress(data.return_address || '');
-        setReturnPolicy(data.return_policy || '');
-      }
-      setLoading(false);
     } catch (e) {
       console.error(e);
+    } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     AppBridgeHelper.closeLoader();
-  }, []);
-
-  useEffect(() => {
-    loadSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    TokenHelpers.getTokenForIframeApp().then((t) => {
+      setToken(t);
+      if (t) loadSettings(t);
+      else setLoading(false);
+    });
+  }, [loadSettings]);
 
   const saveSettings = async () => {
-    setSaving(true);
-    const id = merchantId || (await getMerchantId());
-
-    if (!id) {
-      setSaving(false);
-      toast('Mağaza bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.', 'error');
+    const t = token || (await TokenHelpers.getTokenForIframeApp());
+    if (!t) {
+      toast('Oturum bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.', 'error');
       return;
     }
+
+    setSaving(true);
 
     let uploadedLogo = logoUrl;
 
     if (logoFile) {
-      const fileName = `${merchantId}-${Date.now()}`;
+      const fileName = `${merchantId || Date.now()}-${Date.now()}`;
       const { error: uploadError } = await supabase.storage.from('store-assets').upload(fileName, logoFile, { upsert: true });
 
       if (uploadError) {
@@ -97,9 +82,10 @@ export default function SettingsPage() {
       uploadedLogo = supabase.storage.from('store-assets').getPublicUrl(fileName).data.publicUrl;
     }
 
-    const { error } = await supabase.from('store_settings').upsert(
-      {
-        merchant_id: id,
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${t}` },
+      body: JSON.stringify({
         store_name: storeName,
         notification_email: notificationEmail,
         support_email: supportEmail,
@@ -107,20 +93,16 @@ export default function SettingsPage() {
         primary_color: primaryColor,
         return_address: returnAddress,
         return_policy: returnPolicy,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'merchant_id' },
-    );
+      }),
+    });
 
     setSaving(false);
 
-    if (error) {
-      console.error(error);
+    if (!res.ok) {
       toast('Ayarlar kaydedilemedi', 'error');
       return;
     }
 
-    setMerchantId(id);
     toast('Ayarlar kaydedildi', 'success');
   };
 

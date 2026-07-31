@@ -40,7 +40,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 });
     }
 
-    return NextResponse.json({ data: data ?? null });
+    // Always return merchant_id even when no settings row exists yet.
+    // This ensures the customer portal can always submit returns correctly.
+    const settings: PublicStoreSettings = data ?? {
+      merchant_id: merchantId,
+      store_name: null,
+      logo_url: null,
+      primary_color: null,
+      support_email: null,
+      return_policy: null,
+    };
+
+    return NextResponse.json({ data: settings });
   } catch (err) {
     console.error('store-settings hatası:', err);
     return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 });
