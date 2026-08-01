@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification } from '@/lib/notifications/create';
+import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -190,6 +191,14 @@ export async function POST(request: NextRequest) {
     message: `${notePrefix} · ${returnRow.rf_number}`,
     relatedReturnId: return_id,
   });
+
+  triggerWebhookEvent(returnRow.merchant_id, 'automation.triggered', {
+    return_request_id: return_id,
+    rf_number: returnRow.rf_number,
+    rule_name: matchedRule.name,
+    action_taken: matchedRule.action,
+    matched: true,
+  }).catch(() => undefined);
 
   return NextResponse.json({ evaluated: true, matched: true, action: newStatus, rule: matchedRule.name });
 }

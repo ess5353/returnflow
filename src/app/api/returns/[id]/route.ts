@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification, type NotificationType } from '@/lib/notifications/create';
+import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
+import type { WebhookEvent } from '@/lib/webhooks/events';
 
 const NOTIFIABLE_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Tamamlandı']);
 
@@ -77,6 +79,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           message: data.customer_name,
           relatedReturnId: id,
         });
+
+        // Webhook trigger
+        const webhookEventMap: Record<string, WebhookEvent> = {
+          Onaylandı: isExchange ? 'exchange.approved' : 'return.approved',
+          Reddedildi: 'return.rejected',
+          Tamamlandı: isExchange ? 'exchange.completed' : 'return.completed',
+        };
+        const webhookEvent = webhookEventMap[newStatus];
+        if (webhookEvent) {
+          triggerWebhookEvent(user.merchantId, webhookEvent, {
+            id,
+            rf_number: data.rf_number,
+            customer_name: data.customer_name,
+            status: newStatus,
+            request_type: data.request_type,
+          }).catch(() => undefined);
+        }
       });
   }
 

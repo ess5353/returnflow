@@ -5,6 +5,7 @@ import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification } from '@/lib/notifications/create';
+import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 
 // ── GET: list all returns for the authenticated merchant ───────────────────
 export async function GET(request: NextRequest) {
@@ -143,6 +144,19 @@ export async function POST(request: NextRequest) {
     message: `${customer_name} · Sipariş ${order_id}`,
     relatedReturnId: inserted.id,
   });
+
+  triggerWebhookEvent(merchant_id, rType === 'exchange' ? 'exchange.created' : 'return.created', {
+    id: inserted.id,
+    rf_number,
+    order_id: String(order_id),
+    customer_name,
+    customer_email: customer_email ?? null,
+    product: product ?? '',
+    reason,
+    status: 'Yeni Talep',
+    request_type: rType,
+    amount: String(amount),
+  }).catch(() => undefined);
 
   return NextResponse.json({ data: inserted });
 }
