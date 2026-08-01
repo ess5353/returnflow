@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuditLog, getIp } from '@/lib/audit/log';
 
 export async function GET(request: NextRequest) {
   const user = getUserFromRequest(request);
@@ -52,6 +53,15 @@ export async function POST(request: NextRequest) {
     console.error('exports POST error:', error);
     return NextResponse.json({ error: 'Failed to save export record' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'export.generated',
+    entityType: 'export',
+    metadata: { format: body.format ?? 'xlsx', row_count: body.row_count ?? 0, file_name: body.file_name ?? 'export' },
+    ipAddress: getIp(request),
+  });
 
   return NextResponse.json({ ok: true });
 }

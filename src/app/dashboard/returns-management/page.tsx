@@ -19,6 +19,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Download,
   FileX,
   Filter,
@@ -81,6 +82,16 @@ type ReturnNote = {
   id: string;
   author: string;
   message: string;
+  created_at: string;
+};
+
+type ReturnAuditLog = {
+  id: string;
+  user_label: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -278,6 +289,53 @@ function NoteRow({ note, onDelete }: { note: ReturnNote; onDelete: (id: string) 
   );
 }
 
+// ─── Audit timeline ──────────────────────────────────────────────────────────
+
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  'return.created': 'İade oluşturuldu',
+  'return.approved': 'İade onaylandı',
+  'return.rejected': 'İade reddedildi',
+  'return.completed': 'İade tamamlandı',
+  'exchange.created': 'Değişim oluşturuldu',
+  'exchange.approved': 'Değişim onaylandı',
+  'exchange.completed': 'Değişim tamamlandı',
+};
+
+function AuditTimeline({ logs, loading }: { logs: ReturnAuditLog[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Denetim Geçmişi</p>
+        <Skeleton className="h-14 w-full rounded-xl" />
+      </div>
+    );
+  }
+  if (logs.length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Denetim Geçmişi</p>
+      <div className="rounded-xl border border-border bg-muted/40 divide-y divide-border overflow-hidden">
+        {logs.map((log) => (
+          <div key={log.id} className="flex items-start gap-3 px-3 py-2.5">
+            <ClipboardList className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs font-medium text-foreground">
+                  {AUDIT_ACTION_LABELS[log.action] ?? log.action}
+                </p>
+                <p className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+                  {formatDateTime(log.created_at)}
+                </p>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{log.user_label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Automation activity ──────────────────────────────────────────────────────
 
 function AutomationActivity({ logs, loading }: { logs: AutomationLog[]; loading: boolean }) {
@@ -404,6 +462,8 @@ export default function ReturnsManagementPage() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [notes, setNotes] = useState<ReturnNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<ReturnAuditLog[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [noteInput, setNoteInput] = useState('');
   const [submittingNote, setSubmittingNote] = useState(false);
   const { settings, loadSettings } = useStoreSettings();
@@ -459,10 +519,12 @@ export default function ReturnsManagementPage() {
     if (!drawerRowId || !token) {
       setAutomationLogs([]);
       setNotes([]);
+      setAuditLogs([]);
       return;
     }
     setLogsLoading(true);
     setNotesLoading(true);
+    setAuditLoading(true);
     fetch(`/api/returns/${drawerRowId}/logs`, { headers: { Authorization: `JWT ${token}` } })
       .then((r) => r.json())
       .then(({ data }) => setAutomationLogs(data ?? []))
@@ -473,6 +535,11 @@ export default function ReturnsManagementPage() {
       .then(({ data }) => setNotes(data ?? []))
       .catch(() => setNotes([]))
       .finally(() => setNotesLoading(false));
+    fetch(`/api/returns/${drawerRowId}/audit`, { headers: { Authorization: `JWT ${token}` } })
+      .then((r) => r.json())
+      .then(({ data }) => setAuditLogs(data ?? []))
+      .catch(() => setAuditLogs([]))
+      .finally(() => setAuditLoading(false));
   }, [drawerRowId, token]);
 
   // ── Header checkbox indeterminate state ───────────────────────────────────
@@ -1159,6 +1226,9 @@ export default function ReturnsManagementPage() {
                   onAddNote={addNote}
                   onDeleteNote={deleteNote}
                 />
+
+                {/* Audit timeline */}
+                <AuditTimeline logs={auditLogs} loading={auditLoading} />
 
                 {/* Automation activity */}
                 <AutomationActivity logs={automationLogs} loading={logsLoading} />

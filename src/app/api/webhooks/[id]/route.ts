@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WebhookEvent } from '@/lib/webhooks/events';
+import { createAuditLog, getIp } from '@/lib/audit/log';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = getUserFromRequest(request);
@@ -43,6 +44,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'Failed to update webhook' }, { status: 500 });
   }
 
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'webhook.updated',
+    entityType: 'webhook',
+    entityId: id,
+    metadata: { updated_fields: Object.keys(update).filter((k) => k !== 'updated_at') },
+    ipAddress: getIp(request),
+  });
+
   return NextResponse.json({ ok: true });
 }
 
@@ -62,6 +73,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     console.error('webhook DELETE error:', error);
     return NextResponse.json({ error: 'Failed to delete webhook' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'webhook.deleted',
+    entityType: 'webhook',
+    entityId: id,
+    ipAddress: getIp(request),
+  });
 
   return NextResponse.json({ ok: true });
 }

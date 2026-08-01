@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuditLog, getIp } from '@/lib/audit/log';
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = getUserFromRequest(request);
@@ -19,6 +20,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     console.error('api-keys DELETE error:', error);
     return NextResponse.json({ error: 'Failed to revoke key' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'api_key.revoked',
+    entityType: 'api_key',
+    entityId: id,
+    ipAddress: getIp(request),
+  });
 
   return NextResponse.json({ ok: true });
 }

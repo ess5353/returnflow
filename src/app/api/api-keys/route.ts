@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuditLog, getIp } from '@/lib/audit/log';
 
 export async function GET(request: NextRequest) {
   const user = getUserFromRequest(request);
@@ -60,6 +61,16 @@ export async function POST(request: NextRequest) {
     console.error('api-keys POST error:', error);
     return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'api_key.created',
+    entityType: 'api_key',
+    entityId: data?.id as string | undefined,
+    metadata: { name: name?.trim(), key_prefix: keyPrefix, expires_at: expires_at ?? null },
+    ipAddress: getIp(request),
+  });
 
   // Return the plaintext key ONCE — never stored, never retrievable again
   return NextResponse.json({ data: { ...data, raw_key: rawKey } }, { status: 201 });

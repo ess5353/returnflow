@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuditLog, getIp } from '@/lib/audit/log';
 
 export async function GET(request: NextRequest) {
   const user = getUserFromRequest(request);
@@ -48,6 +49,14 @@ export async function POST(request: NextRequest) {
     console.error('Settings save error:', error);
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'settings.updated',
+    entityType: 'settings',
+    ipAddress: getIp(request),
+  });
 
   return NextResponse.json({ data: { success: true } });
 }

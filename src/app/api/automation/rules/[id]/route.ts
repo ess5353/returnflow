@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuditLog } from '@/lib/audit/log';
 
 // PATCH: update rule fields; also handles priority swap for move-up/move-down
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,6 +38,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'Failed to update rule' }, { status: 500 });
   }
 
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'automation_rule.updated',
+    entityType: 'automation_rule',
+    entityId: id,
+    metadata: { updated_fields: Object.keys(update).filter((k) => k !== 'updated_at') },
+  });
+
   return NextResponse.json({ data });
 }
 
@@ -57,6 +67,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     console.error('automation rule DELETE error:', error);
     return NextResponse.json({ error: 'Failed to delete rule' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'automation_rule.deleted',
+    entityType: 'automation_rule',
+    entityId: id,
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuditLog, getIp } from '@/lib/audit/log';
 
 export async function PATCH(
   request: NextRequest,
@@ -38,6 +39,16 @@ export async function PATCH(
     console.error('email-templates PATCH error:', error);
     return NextResponse.json({ error: 'Failed to save template' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'email_template.updated',
+    entityType: 'email_template',
+    entityId: type,
+    metadata: { template_type: type },
+    ipAddress: getIp(request),
+  });
 
   return NextResponse.json({ ok: true });
 }

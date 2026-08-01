@@ -6,6 +6,7 @@ import { getIkas } from '@/helpers/api-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
+import { createAuditLog } from '@/lib/audit/log';
 
 // ── GET: list all returns for the authenticated merchant ───────────────────
 export async function GET(request: NextRequest) {
@@ -143,6 +144,15 @@ export async function POST(request: NextRequest) {
     title: rType === 'exchange' ? `Yeni Değişim: ${rf_number}` : `Yeni İade: ${rf_number}`,
     message: `${customer_name} · Sipariş ${order_id}`,
     relatedReturnId: inserted.id,
+  });
+
+  createAuditLog({
+    merchantId: merchant_id,
+    user: 'Müşteri',
+    action: rType === 'exchange' ? 'exchange.created' : 'return.created',
+    entityType: rType === 'exchange' ? 'exchange' : 'return',
+    entityId: inserted.id,
+    metadata: { rf_number, order_id: String(order_id), customer_name, amount: String(amount) },
   });
 
   triggerWebhookEvent(merchant_id, rType === 'exchange' ? 'exchange.created' : 'return.created', {

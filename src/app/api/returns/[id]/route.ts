@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification, type NotificationType } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import type { WebhookEvent } from '@/lib/webhooks/events';
+import { createAuditLog, getIp, type AuditAction } from '@/lib/audit/log';
 
 const NOTIFIABLE_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Tamamlandı']);
 
@@ -95,6 +96,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             status: newStatus,
             request_type: data.request_type,
           }).catch(() => undefined);
+        }
+
+        // Audit log
+        const auditActionMap: Record<string, AuditAction> = {
+          Onaylandı: isExchange ? 'exchange.approved' : 'return.approved',
+          Reddedildi: 'return.rejected',
+          Tamamlandı: isExchange ? 'exchange.completed' : 'return.completed',
+        };
+        const auditAction = auditActionMap[newStatus];
+        if (auditAction) {
+          createAuditLog({
+            merchantId: user.merchantId,
+            user: 'Mağaza',
+            action: auditAction,
+            entityType: isExchange ? 'exchange' : 'return',
+            entityId: id,
+            metadata: { rf_number: data.rf_number, status: newStatus },
+          });
         }
       });
   }

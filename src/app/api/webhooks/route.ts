@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WebhookEvent } from '@/lib/webhooks/events';
+import { createAuditLog, getIp } from '@/lib/audit/log';
 
 export async function GET(request: NextRequest) {
   const user = getUserFromRequest(request);
@@ -55,6 +56,16 @@ export async function POST(request: NextRequest) {
     console.error('webhooks POST error:', error);
     return NextResponse.json({ error: 'Failed to create webhook' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'webhook.created',
+    entityType: 'webhook',
+    entityId: data?.id as string | undefined,
+    metadata: { name, url, events },
+    ipAddress: getIp(request),
+  });
 
   return NextResponse.json({ data });
 }

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuditLog } from '@/lib/audit/log';
 
 // GET: list rules for merchant
 export async function GET(request: NextRequest) {
@@ -78,6 +79,15 @@ export async function POST(request: NextRequest) {
     console.error('automation rule POST error:', error);
     return NextResponse.json({ error: 'Failed to create rule' }, { status: 500 });
   }
+
+  createAuditLog({
+    merchantId: user.merchantId,
+    user: 'Mağaza',
+    action: 'automation_rule.created',
+    entityType: 'automation_rule',
+    entityId: data?.id as string | undefined,
+    metadata: { name, action },
+  });
 
   return NextResponse.json({ data });
 }
