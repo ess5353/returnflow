@@ -7,8 +7,15 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // ── GET: list all returns for the authenticated merchant ───────────────────
 export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization') ?? '(none)';
+  console.error('[DEBUG GET] Authorization header present:', authHeader !== '(none)');
+
   const user = getUserFromRequest(request);
+  console.error('[DEBUG GET] user from JWT:', JSON.stringify(user));
+
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  console.error('[DEBUG GET] querying with merchantId:', user.merchantId);
 
   const { data, error } = await supabaseAdmin
     .from('return_requests')
@@ -17,9 +24,12 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('returns GET error:', error);
+    console.error('[DEBUG GET] Supabase error:', JSON.stringify(error));
     return NextResponse.json({ error: 'Failed to load returns' }, { status: 500 });
   }
+
+  console.error('[DEBUG GET] rows returned:', data?.length ?? 0);
+  console.error('[DEBUG GET] first row merchant_id:', data?.[0]?.merchant_id ?? '(no rows)');
 
   return NextResponse.json({ data: data ?? [] });
 }
