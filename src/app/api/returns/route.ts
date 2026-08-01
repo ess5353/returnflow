@@ -33,7 +33,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { order_id, customer_name, customer_email, product, products, reason, description, amount, media_urls } = body as {
+  const {
+    order_id, customer_name, customer_email, product, products,
+    reason, description, amount, media_urls,
+    request_type, exchange_type, exchange_variant,
+  } = body as {
     order_id: string;
     customer_name: string;
     customer_email?: string;
@@ -43,7 +47,12 @@ export async function POST(request: NextRequest) {
     description?: string;
     amount: string | number;
     media_urls?: string[];
+    request_type?: 'return' | 'exchange';
+    exchange_type?: 'same_product_size' | 'same_product_color' | 'different_product';
+    exchange_variant?: string;
   };
+
+  const rType = request_type ?? 'return';
 
   if (!order_id || !reason) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -69,18 +78,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Merchant not found' }, { status: 500 });
   }
 
-  // Check for duplicate (one return per order per merchant)
+  // One return OR one exchange per order per merchant (not two of the same type)
   const { data: existing } = await supabaseAdmin
     .from('return_requests')
     .select('id')
     .eq('order_id', String(order_id))
-    .eq('merchant_id', merchant_id);
+    .eq('merchant_id', merchant_id)
+    .eq('request_type', rType);
 
   if (existing && existing.length > 0) {
     return NextResponse.json({ error: 'DUPLICATE' }, { status: 409 });
   }
 
-  // Generate RF number (merchant-scoped daily sequence)
+  // Generate number (merchant + type scoped daily sequence)
   const now = new Date();
   const datePart = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -89,10 +99,12 @@ export async function POST(request: NextRequest) {
     .from('return_requests')
     .select('*', { count: 'exact', head: true })
     .eq('merchant_id', merchant_id)
+    .eq('request_type', rType)
     .gte('created_at', startOfDay);
 
   const sequence = String((count ?? 0) + 1).padStart(4, '0');
-  const rf_number = `RF-${datePart}-${sequence}`;
+  const prefix = rType === 'exchange' ? 'EX' : 'RF';
+  const rf_number = `${prefix}-${datePart}-${sequence}`;
 
   const insertPayload = {
     merchant_id,
@@ -107,6 +119,9 @@ export async function POST(request: NextRequest) {
     amount: String(amount),
     status: 'Yeni Talep',
     media_urls: media_urls ?? [],
+    request_type: rType,
+    exchange_type: rType === 'exchange' ? (exchange_type ?? null) : null,
+    exchange_variant: rType === 'exchange' ? (exchange_variant ?? null) : null,
   };
 
   const { data: inserted, error: insertError } = await supabaseAdmin

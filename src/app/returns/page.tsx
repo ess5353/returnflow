@@ -4,33 +4,66 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/toast';
 import type { PublicStoreSettings } from '@/app/api/store-settings/route';
+import { ArrowLeftRight, RotateCcw } from 'lucide-react';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Step = 'search' | 'order' | 'type' | 'reason' | 'exchange' | 'success';
+type RequestType = 'return' | 'exchange';
+type ExchangeType = 'same_product_size' | 'same_product_color' | 'different_product';
+
+const EXCHANGE_TYPE_OPTIONS: { value: ExchangeType; label: string; description: string }[] = [
+  { value: 'same_product_size', label: 'Aynı ürün, farklı beden', description: 'Aynı ürünü farklı bedende almak istiyorum.' },
+  { value: 'same_product_color', label: 'Aynı ürün, farklı renk', description: 'Aynı ürünü farklı renkte almak istiyorum.' },
+  { value: 'different_product', label: 'Farklı ürün', description: 'Başka bir ürünle değiştirmek istiyorum.' },
+];
+
+const EXCHANGE_VARIANT_LABEL: Record<ExchangeType, string> = {
+  same_product_size: 'İstediğiniz beden',
+  same_product_color: 'İstediğiniz renk',
+  different_product: 'İstediğiniz ürün adı',
+};
+
+const EXCHANGE_VARIANT_PLACEHOLDER: Record<ExchangeType, string> = {
+  same_product_size: 'Örn: XL, 42, Large...',
+  same_product_color: 'Örn: Kırmızı, Lacivert...',
+  different_product: 'Almak istediğiniz ürünü yazın',
+};
+
+const EXCHANGE_TYPE_LABELS: Record<ExchangeType, string> = {
+  same_product_size: 'Aynı ürün, farklı beden',
+  same_product_color: 'Aynı ürün, farklı renk',
+  different_product: 'Farklı ürün',
+};
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReturnsPage() {
-  const [step, setStep] = useState<'search' | 'order' | 'reason' | 'success'>('search');
+  const [step, setStep] = useState<Step>('search');
+  const [requestType, setRequestType] = useState<RequestType>('return');
+  const [exchangeType, setExchangeType] = useState<ExchangeType | null>(null);
+  const [exchangeVariant, setExchangeVariant] = useState('');
   const [reason, setReason] = useState('');
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<FileList | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState('');
   const [orderNo, setOrderNo] = useState('');
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<Record<string, unknown> | null>(null);
   const [createdRfNumber, setCreatedRfNumber] = useState('');
-  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [selectedItems, setSelectedItems] = useState<{ name: string; quantity: number; price: number }[]>([]);
   const [settings, setSettings] = useState<PublicStoreSettings | null>(null);
 
   useEffect(() => {
     fetch('/api/store-settings')
       .then((res) => res.json())
-      .then((result) => {
-        if (result.data) setSettings(result.data);
-      })
+      .then((result) => { if (result.data) setSettings(result.data); })
       .catch((err) => console.error('Store settings yüklenemedi:', err));
   }, []);
 
-  const createReturnRequest = async () => {
+  const createRequest = async () => {
     setIsSubmitting(true);
 
-    // Upload files to Supabase Storage (storage bucket uses anon key — unchanged)
     const uploadedUrls: string[] = [];
     if (files) {
       for (const file of Array.from(files)) {
@@ -48,45 +81,60 @@ export default function ReturnsPage() {
       }
     }
 
-    // Submit return via server-side API (service role, merchant-scoped)
+    const payload: Record<string, unknown> = {
+      order_id: (order as Record<string, unknown>).order_no,
+      customer_name: (order as Record<string, unknown>).customer_name,
+      customer_email: email,
+      product: selectedItems.map((item) => item.name).join(', '),
+      products: selectedItems.map((item) => ({ name: item.name, quantity: item.quantity, price: item.price })),
+      amount: selectedItems.reduce((total, item) => total + Number(item.price || 0), 0),
+      media_urls: uploadedUrls,
+      request_type: requestType,
+    };
+
+    if (requestType === 'return') {
+      payload.reason = reason;
+      payload.description = description;
+    } else {
+      payload.reason = 'Değişim Talebi';
+      payload.description = description;
+      payload.exchange_type = exchangeType;
+      payload.exchange_variant = exchangeVariant;
+    }
+
     const res = await fetch('/api/returns', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        order_id: order.order_no,
-        customer_name: order.customer_name,
-        customer_email: email,
-        product: selectedItems.map((item) => item.name).join(', '),
-        products: selectedItems.map((item) => ({ name: item.name, quantity: item.quantity, price: item.price })),
-        reason,
-        description,
-        amount: selectedItems.reduce((total, item) => total + Number(item.price || 0), 0),
-        media_urls: uploadedUrls,
-      }),
+      body: JSON.stringify(payload),
     });
 
     const result = await res.json();
 
     if (!res.ok || !result.data) {
       setIsSubmitting(false);
-      toast('Kayıt sırasında hata oluştu', 'error');
+      toast(res.status === 409 ? 'Bu sipariş için zaten bir talep oluşturulmuş.' : 'Kayıt sırasında hata oluştu', 'error');
       return;
     }
 
     const rfNumber: string = result.data.rf_number;
 
-    // Fire automation evaluation (best-effort — do not block success screen)
-    fetch('/api/automation/evaluate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ return_id: result.data.id }),
-    }).catch(() => {});
+    if (requestType === 'return') {
+      fetch('/api/automation/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ return_id: result.data.id }),
+      }).catch(() => {});
+    }
 
-    // Send notification email (best-effort)
     fetch('/api/email/return-created', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, customerName: order.customer_name, rfNumber, orderNo: order.order_no }),
+      body: JSON.stringify({
+        email,
+        customerName: (order as Record<string, unknown>).customer_name,
+        rfNumber,
+        orderNo: (order as Record<string, unknown>).order_no,
+      }),
     }).catch(() => {});
 
     setCreatedRfNumber(rfNumber);
@@ -100,7 +148,6 @@ export default function ReturnsPage() {
       return;
     }
 
-    // Duplicate check is now server-side; just look up the order
     const url = `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}&email=${encodeURIComponent(email)}`;
     const response = await fetch(url);
     const result = await response.json();
@@ -115,15 +162,18 @@ export default function ReturnsPage() {
   };
 
   const accentColor = settings?.primary_color || '#000000';
-  const STEPS = ['Sipariş Bul', 'Ürün Seç', 'Sebep Gir'] as const;
-  const stepIndex = step === 'search' ? 0 : step === 'order' ? 1 : step === 'reason' ? 2 : 3;
+  const STEPS = ['Sipariş Bul', 'Ürün Seç', 'Talep Türü', requestType === 'exchange' ? 'Değişim Detayı' : 'Sebep Gir'];
+  const stepIndex = step === 'search' ? 0 : step === 'order' ? 1 : step === 'type' ? 2 : (step === 'reason' || step === 'exchange') ? 3 : 4;
+  const canSubmitExchange = exchangeType !== null && exchangeVariant.trim().length > 0;
+  const orderItems = ((order as Record<string, unknown>)?.items as { name: string; quantity: number; price: number }[]) ?? [];
 
   return (
     <main className="min-h-screen bg-[#f5f6fa] px-4 py-8 md:p-10">
       <section className="mx-auto max-w-5xl">
         <div className="rounded-3xl bg-white shadow-xl overflow-hidden border border-gray-100">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr]">
-            {/* Left panel */}
+
+            {/* ── Left panel ─────────────────────────────────────────────── */}
             <div style={{ background: accentColor }} className="text-white p-8 md:p-10 relative overflow-hidden">
               <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/10" />
               <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-white/5" />
@@ -134,14 +184,16 @@ export default function ReturnsPage() {
                     <img src={settings.logo_url} alt="Logo" className="h-12 w-12 rounded-xl bg-white object-contain p-2 border border-white/20" />
                   )}
                   <div>
-                    <div className="text-[10px] font-bold tracking-[0.3em] text-white/60 uppercase">Return Portal</div>
+                    <div className="text-[10px] font-bold tracking-[0.3em] text-white/60 uppercase">Müşteri Hizmetleri</div>
                     <div className="text-lg font-bold leading-tight">{settings?.store_name || 'PELYXCOMMERCE'}</div>
                   </div>
                 </div>
 
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-none">İade Merkezi</h1>
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-none">
+                  {requestType === 'exchange' && step !== 'type' ? 'Değişim Merkezi' : 'İade & Değişim'}
+                </h1>
                 <p className="mt-4 text-white/70 text-base leading-7">
-                  Sipariş bilgilerinizi girin, iade talebinizi birkaç adımda oluşturun.
+                  Sipariş bilgilerinizi girin, talebinizi birkaç adımda oluşturun.
                 </p>
 
                 {settings?.support_email && (
@@ -159,11 +211,9 @@ export default function ReturnsPage() {
                   <div className="mt-10 space-y-3">
                     {STEPS.map((label, i) => (
                       <div key={label} className="flex items-center gap-3">
-                        <div
-                          className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
-                            i < stepIndex ? 'bg-white text-black' : i === stepIndex ? 'bg-white text-black' : 'bg-white/20 text-white/60'
-                          }`}
-                        >
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
+                          i < stepIndex ? 'bg-white text-black' : i === stepIndex ? 'bg-white text-black' : 'bg-white/20 text-white/60'
+                        }`}>
                           {i < stepIndex ? '✓' : i + 1}
                         </div>
                         <span className={`text-sm font-medium ${i <= stepIndex ? 'text-white' : 'text-white/50'}`}>{label}</span>
@@ -174,36 +224,36 @@ export default function ReturnsPage() {
               </div>
             </div>
 
-            {/* Right panel */}
+            {/* ── Right panel ────────────────────────────────────────────── */}
             <div className="p-7 md:p-10">
+
+              {/* STEP: Search */}
               {step === 'search' && (
                 <>
                   <h2 className="text-2xl font-bold tracking-tight">Siparişimi Bul</h2>
                   <p className="text-muted-foreground mt-2 mb-7 text-sm">
-                    İade talebi oluşturmak için sipariş numaranızı ve e-posta adresinizi girin.
+                    İade veya değişim talebi oluşturmak için sipariş numaranızı ve e-posta adresinizi girin.
                   </p>
 
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="orderNo" className="mb-1.5 block text-xs font-medium text-gray-600">
-                        Sipariş Numarası
-                      </label>
+                      <label htmlFor="orderNo" className="mb-1.5 block text-xs font-medium text-gray-600">Sipariş Numarası</label>
                       <input
                         id="orderNo"
                         value={orderNo}
                         onChange={(e) => setOrderNo(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && findOrder()}
                         placeholder="#1001"
                         className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
                       />
                     </div>
                     <div>
-                      <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-gray-600">
-                        E-posta Adresi
-                      </label>
+                      <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-gray-600">E-posta Adresi</label>
                       <input
                         id="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && findOrder()}
                         placeholder="siparis@email.com"
                         type="email"
                         className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
@@ -220,33 +270,34 @@ export default function ReturnsPage() {
                 </>
               )}
 
-              {step === 'order' && (
+              {/* STEP: Order (select items) */}
+              {step === 'order' && order && (
                 <>
                   <h2 className="text-2xl font-bold tracking-tight">Sipariş Bulundu</h2>
-                  <p className="text-muted-foreground mt-2 mb-7 text-sm">İade etmek istediğiniz ürünleri seçin.</p>
+                  <p className="text-muted-foreground mt-2 mb-7 text-sm">İşlem yapmak istediğiniz ürünleri seçin.</p>
 
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5 mb-6">
                     <p className="text-xs text-gray-500">Sipariş No</p>
-                    <p className="font-bold text-lg mt-0.5">{order.id}</p>
+                    <p className="font-bold text-lg mt-0.5">{order.id as string}</p>
 
                     <div className="mt-5">
                       <p className="text-xs text-gray-500 mb-3">Ürünler</p>
                       <div className="space-y-2">
-                        {order.items?.map((item: any, index: number) => {
+                        {orderItems.map((item, index) => {
                           const checked = selectedItems.some((x) => x.name === item.name);
                           return (
                             <button
                               key={index}
-                              onClick={() =>
-                                checked ? setSelectedItems(selectedItems.filter((x) => x.name !== item.name)) : setSelectedItems([...selectedItems, item])
+                              onClick={() => checked
+                                ? setSelectedItems(selectedItems.filter((x) => x.name !== item.name))
+                                : setSelectedItems([...selectedItems, item])
                               }
                               style={checked ? { borderColor: accentColor, background: accentColor } : {}}
                               className={`w-full rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${
                                 checked ? 'text-white' : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300'
                               }`}
                             >
-                              {checked ? '✓ ' : ''}
-                              {item.name} — {item.quantity} adet — ₺{item.price}
+                              {checked ? '✓ ' : ''}{item.name} — {item.quantity} adet — ₺{item.price}
                             </button>
                           );
                         })}
@@ -255,13 +306,13 @@ export default function ReturnsPage() {
 
                     <div className="mt-5">
                       <p className="text-xs text-gray-500">Toplam Tutar</p>
-                      <p className="font-bold text-lg mt-0.5">{order.amount}</p>
+                      <p className="font-bold text-lg mt-0.5">{order.amount as string}</p>
                     </div>
                   </div>
 
                   <button
                     disabled={selectedItems.length === 0}
-                    onClick={() => setStep('reason')}
+                    onClick={() => setStep('type')}
                     style={{ background: accentColor }}
                     className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-30"
                   >
@@ -270,6 +321,49 @@ export default function ReturnsPage() {
                 </>
               )}
 
+              {/* STEP: Type choice (Return vs Exchange) */}
+              {step === 'type' && (
+                <>
+                  <h2 className="text-2xl font-bold tracking-tight">Ne yapmak istersiniz?</h2>
+                  <p className="text-muted-foreground mt-2 mb-7 text-sm">
+                    Seçtiğiniz ürün için iade mi yoksa değişim mi istediğinizi belirtin.
+                  </p>
+
+                  <div className="space-y-3 mb-8">
+                    <button
+                      onClick={() => { setRequestType('return'); setStep('reason'); }}
+                      className="w-full flex items-start gap-4 rounded-2xl border-2 border-gray-200 bg-white px-5 py-4 text-left hover:border-gray-400 transition-colors group"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">
+                        <RotateCcw className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900">İade Et</p>
+                        <p className="text-sm text-gray-500 mt-0.5">Ürünü iade etmek ve ücret iadesi almak istiyorum.</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setRequestType('exchange'); setStep('exchange'); }}
+                      className="w-full flex items-start gap-4 rounded-2xl border-2 border-gray-200 bg-white px-5 py-4 text-left hover:border-gray-400 transition-colors group"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 group-hover:bg-violet-100 transition-colors">
+                        <ArrowLeftRight className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900">Değişim Yap</p>
+                        <p className="text-sm text-gray-500 mt-0.5">Ürünü farklı beden, renk veya başka bir ürünle değiştirmek istiyorum.</p>
+                      </div>
+                    </button>
+                  </div>
+
+                  <button onClick={() => setStep('order')} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                    ← Geri Dön
+                  </button>
+                </>
+              )}
+
+              {/* STEP: Return reason */}
               {step === 'reason' && (
                 <>
                   <h2 className="text-2xl font-bold tracking-tight">İade Sebebi</h2>
@@ -298,7 +392,7 @@ export default function ReturnsPage() {
                       id="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      rows={4}
+                      rows={3}
                       placeholder="İade sebebini detaylı açıklayın..."
                       className="w-full rounded-xl border border-gray-200 p-4 text-sm outline-none focus:border-gray-400 resize-none transition-colors"
                     />
@@ -321,41 +415,132 @@ export default function ReturnsPage() {
 
                   <button
                     disabled={!reason || isSubmitting}
-                    onClick={createReturnRequest}
+                    onClick={createRequest}
                     style={{ background: accentColor }}
                     className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-30"
                   >
                     {isSubmitting ? 'Yükleniyor...' : 'İade Talebi Oluştur'}
                   </button>
+                  <button onClick={() => setStep('type')} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                    ← Geri Dön
+                  </button>
                 </>
               )}
 
+              {/* STEP: Exchange detail */}
+              {step === 'exchange' && (
+                <>
+                  <h2 className="text-2xl font-bold tracking-tight">Değişim Detayı</h2>
+                  <p className="text-muted-foreground mt-2 mb-7 text-sm">Nasıl bir değişim yapmak istediğinizi belirtin.</p>
+
+                  {/* Exchange type */}
+                  <div className="space-y-2.5 mb-6">
+                    {EXCHANGE_TYPE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => { setExchangeType(opt.value); setExchangeVariant(''); }}
+                        style={exchangeType === opt.value ? { borderColor: accentColor } : {}}
+                        className={`w-full text-left rounded-xl border-2 px-4 py-3.5 transition-colors ${
+                          exchangeType === opt.value
+                            ? 'bg-gray-50'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <p className="text-sm font-semibold text-gray-900">{opt.label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Variant / product input */}
+                  {exchangeType && (
+                    <div className="mb-5">
+                      <label className="block mb-1.5 text-xs font-medium text-gray-600">
+                        {EXCHANGE_VARIANT_LABEL[exchangeType]} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        value={exchangeVariant}
+                        onChange={(e) => setExchangeVariant(e.target.value)}
+                        placeholder={EXCHANGE_VARIANT_PLACEHOLDER[exchangeType]}
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
+                      />
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  <div className="mb-5">
+                    <label htmlFor="exchangeDesc" className="block mb-1.5 text-xs font-medium text-gray-600">
+                      Açıklama <span className="text-gray-400">(isteğe bağlı)</span>
+                    </label>
+                    <textarea
+                      id="exchangeDesc"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      placeholder="Değişim talebinizi detaylı açıklayın..."
+                      className="w-full rounded-xl border border-gray-200 p-4 text-sm outline-none focus:border-gray-400 resize-none transition-colors"
+                    />
+                  </div>
+
+                  {/* Media */}
+                  <div className="mb-6">
+                    <label htmlFor="exchangeMedia" className="block mb-1.5 text-xs font-medium text-gray-600">
+                      Fotoğraf / Video <span className="text-gray-400">(isteğe bağlı)</span>
+                    </label>
+                    <input
+                      id="exchangeMedia"
+                      type="file"
+                      multiple
+                      accept="image/*,video/*"
+                      onChange={(e) => setFiles(e.target.files)}
+                      className="w-full rounded-xl border border-gray-200 p-4 text-sm"
+                    />
+                    <p className="mt-1.5 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV desteklenir.</p>
+                  </div>
+
+                  <button
+                    disabled={!canSubmitExchange || isSubmitting}
+                    onClick={createRequest}
+                    style={{ background: accentColor }}
+                    className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-30"
+                  >
+                    {isSubmitting ? 'Yükleniyor...' : 'Değişim Talebi Oluştur'}
+                  </button>
+                  <button onClick={() => setStep('type')} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                    ← Geri Dön
+                  </button>
+                </>
+              )}
+
+              {/* STEP: Success */}
               {step === 'success' && (
                 <div className="flex flex-col items-center py-8 text-center">
                   <div
                     style={{ background: accentColor }}
-                    className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full text-white text-2xl"
+                    className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full text-white"
                   >
-                    ✓
+                    {requestType === 'exchange'
+                      ? <ArrowLeftRight className="h-7 w-7" />
+                      : <span className="text-2xl">✓</span>
+                    }
                   </div>
 
-                  <h2 className="text-2xl font-bold tracking-tight">Talebiniz Alındı</h2>
+                  <h2 className="text-2xl font-bold tracking-tight">
+                    {requestType === 'exchange' ? 'Değişim Talebiniz Alındı' : 'İade Talebiniz Alındı'}
+                  </h2>
                   <p className="text-gray-500 mt-3 text-sm leading-6 max-w-xs">
-                    İade talebiniz mağazaya iletildi. İnceleme sonrası size bilgi verilecektir.
+                    Talebiniz mağazaya iletildi. İnceleme sonrası size e-posta ile bilgi verilecektir.
                   </p>
 
                   <div className="mt-8 w-full rounded-2xl bg-gray-50 border border-gray-100 p-5 text-left">
                     <p className="text-xs text-gray-500">Talep No</p>
-                    <p className="text-2xl font-bold mt-0.5">{createdRfNumber}</p>
-                    <p className="mt-3 text-xs text-gray-500 leading-5">
-                      Talebinizi takip etmek için İade Takibi sayfasını ziyaret edebilirsiniz.
-                    </p>
+                    <p className="text-2xl font-bold font-mono mt-0.5">{createdRfNumber}</p>
                     <a
                       href="/track"
                       style={{ background: accentColor }}
                       className="mt-4 inline-flex rounded-xl px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity"
                     >
-                      İade Takibine Git
+                      Takibime Git
                     </a>
 
                     <div className="mt-5 grid grid-cols-2 gap-4">
@@ -364,13 +549,32 @@ export default function ReturnsPage() {
                         <p className="font-semibold text-sm mt-0.5">İncelemede</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Sebep</p>
-                        <p className="font-semibold text-sm mt-0.5">{reason}</p>
+                        <p className="text-xs text-gray-500">Talep Türü</p>
+                        <p className="font-semibold text-sm mt-0.5">{requestType === 'exchange' ? 'Değişim' : 'İade'}</p>
                       </div>
+                      {requestType === 'exchange' && exchangeType && (
+                        <>
+                          <div>
+                            <p className="text-xs text-gray-500">Değişim Türü</p>
+                            <p className="font-semibold text-sm mt-0.5">{EXCHANGE_TYPE_LABELS[exchangeType]}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">İstenen</p>
+                            <p className="font-semibold text-sm mt-0.5 truncate">{exchangeVariant}</p>
+                          </div>
+                        </>
+                      )}
+                      {requestType === 'return' && (
+                        <div>
+                          <p className="text-xs text-gray-500">Sebep</p>
+                          <p className="font-semibold text-sm mt-0.5">{reason}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
+
             </div>
           </div>
         </div>

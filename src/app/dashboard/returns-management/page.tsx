@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
 import {
+  ArrowLeftRight,
   ArrowUpDown,
   CalendarDays,
   Check,
@@ -21,7 +22,9 @@ import {
   FileX,
   Filter,
   MessageSquare,
+  Package,
   RefreshCw,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   X,
@@ -31,6 +34,14 @@ import {
 import { cn } from '@/lib/utils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+type ExchangeType = 'same_product_size' | 'same_product_color' | 'different_product';
+
+const EXCHANGE_TYPE_LABELS: Record<ExchangeType, string> = {
+  same_product_size: 'Aynı ürün, farklı beden',
+  same_product_color: 'Aynı ürün, farklı renk',
+  different_product: 'Farklı ürün',
+};
 
 type ReturnRow = {
   id: string;
@@ -48,6 +59,10 @@ type ReturnRow = {
   created_at: string;
   updated_at: string | null;
   media_urls: string[] | null;
+  request_type: 'return' | 'exchange';
+  exchange_type: ExchangeType | null;
+  exchange_variant: string | null;
+  exchange_price_diff: number | null;
 };
 
 type AutomationLog = {
@@ -60,10 +75,12 @@ type AutomationLog = {
 
 type SortKey = 'newest' | 'oldest' | 'amount_desc' | 'amount_asc';
 type DateFilter = 'all' | 'today' | '7d' | '30d' | '90d';
+type TypeTab = 'return' | 'exchange';
 
 const PAGE_SIZE = 20;
 
-const STATUS_OPTIONS = ['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'] as const;
+const RETURN_STATUS_OPTIONS = ['Tümü', 'Yeni Talep', 'İncelemede', 'Onaylandı', 'Reddedildi'] as const;
+const EXCHANGE_STATUS_OPTIONS = ['Tümü', 'Yeni Talep', 'İncelemede', 'Onaylandı', 'Reddedildi', 'Kargoya Verildi', 'Tamamlandı'] as const;
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'newest', label: 'En Yeni' },
@@ -82,10 +99,11 @@ const DATE_OPTIONS: { value: DateFilter; label: string }[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function statusVariant(status: string): 'pending' | 'approved' | 'rejected' | 'secondary' {
-  if (status === 'Onaylandı') return 'approved';
+function statusVariant(status: string): 'pending' | 'approved' | 'rejected' | 'secondary' | 'shipped' {
+  if (status === 'Onaylandı' || status === 'Tamamlandı') return 'approved';
   if (status === 'Reddedildi') return 'rejected';
-  if (status === 'Yeni Talep') return 'pending';
+  if (status === 'Yeni Talep' || status === 'İncelemede') return 'pending';
+  if (status === 'Kargoya Verildi') return 'shipped';
   return 'secondary';
 }
 
@@ -255,6 +273,9 @@ export default function ReturnsManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Type tab (returns vs exchanges)
+  const [typeTab, setTypeTab] = useState<TypeTab>('return');
+
   // Filters & sort
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Tümü');
@@ -283,6 +304,10 @@ export default function ReturnsManagementPage() {
   const [bulkNote, setBulkNote] = useState('');
   const [bulkNoteLoading, setBulkNoteLoading] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
+  // Exchange-specific drawer state
+  const [exchangePriceDiff, setExchangePriceDiff] = useState('');
+  const [savingPriceDiff, setSavingPriceDiff] = useState(false);
 
   const [token, setToken] = useState<string | null>(null);
   const [automationLogs, setAutomationLogs] = useState<AutomationLog[]>([]);
@@ -321,13 +346,14 @@ export default function ReturnsManagementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Sync admin note when drawer opens with new request ────────────────────
+  // ── Sync admin note + exchange price diff when drawer opens ──────────────
 
   useEffect(() => {
     if (!drawerRow) return;
     if (lastOpenedIdRef.current !== drawerRow.id) {
       lastOpenedIdRef.current = drawerRow.id;
       setAdminNote(drawerRow.admin_note ?? '');
+      setExchangePriceDiff(drawerRow.exchange_price_diff !== null ? String(drawerRow.exchange_price_diff) : '');
     }
   }, [drawerRow]);
 
@@ -347,7 +373,7 @@ export default function ReturnsManagementPage() {
   // ── Header checkbox indeterminate state ───────────────────────────────────
 
   const filtered = useMemo(() => {
-    let r = rows;
+    let r = rows.filter((x) => (x.request_type ?? 'return') === typeTab);
     if (statusFilter !== 'Tümü') r = r.filter((x) => x.status === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -356,12 +382,13 @@ export default function ReturnsManagementPage() {
           (x.rf_number || '').toLowerCase().includes(q) ||
           (x.order_id || '').toLowerCase().includes(q) ||
           (x.customer_name || '').toLowerCase().includes(q) ||
-          (x.customer_email || '').toLowerCase().includes(q),
+          (x.customer_email || '').toLowerCase().includes(q) ||
+          (x.exchange_variant || '').toLowerCase().includes(q),
       );
     }
     r = filterByDate(r, dateFilter);
     return sortRows(r, sortKey);
-  }, [rows, statusFilter, search, dateFilter, sortKey]);
+  }, [rows, typeTab, statusFilter, search, dateFilter, sortKey]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -377,10 +404,15 @@ export default function ReturnsManagementPage() {
     headerCheckRef.current.indeterminate = !allPageSelected && somePageSelected;
   }, [allPageSelected, somePageSelected]);
 
-  // reset page when filters change
+  // reset page when filters or tab change
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, dateFilter, sortKey]);
+  }, [search, statusFilter, dateFilter, sortKey, typeTab]);
+
+  // reset status filter when tab changes
+  useEffect(() => {
+    setStatusFilter('Tümü');
+  }, [typeTab]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -438,6 +470,21 @@ export default function ReturnsManagementPage() {
     toast('Not kaydedildi', 'success');
   };
 
+  const savePriceDiff = async () => {
+    if (!drawerRow || !token) return;
+    setSavingPriceDiff(true);
+    const val = exchangePriceDiff.trim() === '' ? null : Number(exchangePriceDiff);
+    const res = await fetch(`/api/returns/${drawerRow.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ exchange_price_diff: val }),
+    });
+    setSavingPriceDiff(false);
+    if (!res.ok) { toast('Fiyat farkı kaydedilemedi', 'error'); return; }
+    await fetchRows(token);
+    toast('Fiyat farkı kaydedildi', 'success');
+  };
+
   const bulkUpdateStatus = async (status: string) => {
     if (!selected.size || !token) return;
     setBulkActionLoading(true);
@@ -486,8 +533,8 @@ export default function ReturnsManagementPage() {
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">İade Yönetimi</h1>
-                <p className="mt-0.5 text-sm text-muted-foreground">Tüm iade taleplerini görüntüleyin, filtreleyin ve yönetin.</p>
+                <h1 className="text-2xl font-bold tracking-tight">İade & Değişim Yönetimi</h1>
+                <p className="mt-0.5 text-sm text-muted-foreground">Tüm iade ve değişim taleplerini görüntüleyin, filtreleyin ve yönetin.</p>
               </div>
               <Button
                 variant="outline"
@@ -498,6 +545,36 @@ export default function ReturnsManagementPage() {
                 <RefreshCw className="h-3.5 w-3.5" />
                 Yenile
               </Button>
+            </div>
+
+            {/* Type tab */}
+            <div className="flex rounded-xl border border-border overflow-hidden text-sm font-semibold w-fit">
+              <button
+                onClick={() => setTypeTab('return')}
+                className={cn(
+                  'flex items-center gap-2 px-5 py-2.5 transition-colors',
+                  typeTab === 'return' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                İadeler
+                <span className={cn('text-xs rounded-md px-1.5 py-0.5', typeTab === 'return' ? 'bg-white/20 text-background' : 'bg-muted text-muted-foreground')}>
+                  {rows.filter((r) => (r.request_type ?? 'return') === 'return').length}
+                </span>
+              </button>
+              <button
+                onClick={() => setTypeTab('exchange')}
+                className={cn(
+                  'flex items-center gap-2 px-5 py-2.5 transition-colors',
+                  typeTab === 'exchange' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Değişimler
+                <span className={cn('text-xs rounded-md px-1.5 py-0.5', typeTab === 'exchange' ? 'bg-white/20 text-background' : 'bg-muted text-muted-foreground')}>
+                  {rows.filter((r) => r.request_type === 'exchange').length}
+                </span>
+              </button>
             </div>
 
             {/* Search + filters bar */}
@@ -515,7 +592,7 @@ export default function ReturnsManagementPage() {
                 </div>
                 {/* Status pills */}
                 <div className="flex flex-wrap gap-1.5 shrink-0">
-                  {STATUS_OPTIONS.map((s) => (
+                  {(typeTab === 'exchange' ? EXCHANGE_STATUS_OPTIONS : RETURN_STATUS_OPTIONS).map((s) => (
                     <button
                       key={s}
                       onClick={() => setStatusFilter(s)}
@@ -610,7 +687,7 @@ export default function ReturnsManagementPage() {
                       <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">RF No</th>
                       <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Müşteri</th>
                       <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hidden sm:table-cell">Sipariş</th>
-                      <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Sebep</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">{typeTab === 'exchange' ? 'Değişim Türü' : 'Sebep'}</th>
                       <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Tutar</th>
                       <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Durum</th>
                       <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hidden sm:table-cell">Tarih</th>
@@ -685,7 +762,11 @@ export default function ReturnsManagementPage() {
                               <span className="text-xs text-muted-foreground">{row.order_id}</span>
                             </td>
                             <td className="px-3 py-3 hidden md:table-cell">
-                              <span className="text-xs text-muted-foreground truncate max-w-[160px] block">{row.reason}</span>
+                              <span className="text-xs text-muted-foreground truncate max-w-[160px] block">
+                                {row.request_type === 'exchange'
+                                  ? (EXCHANGE_TYPE_LABELS[row.exchange_type as ExchangeType] ?? '—')
+                                  : row.reason}
+                              </span>
                             </td>
                             <td className="px-3 py-3 hidden lg:table-cell">
                               <span className="text-xs font-semibold">₺{Number(row.amount).toLocaleString('tr-TR')}</span>
@@ -783,7 +864,9 @@ export default function ReturnsManagementPage() {
                   <InfoCell label="Sipariş No" value={drawerRow.order_id} />
                   <InfoCell label="Tutar" value={`₺${Number(drawerRow.amount).toLocaleString('tr-TR')}`} />
                   <InfoCell label="E-posta" value={drawerRow.customer_email ?? '—'} span />
-                  <InfoCell label="İade Sebebi" value={drawerRow.reason} span />
+                  {drawerRow.request_type !== 'exchange' && (
+                    <InfoCell label="İade Sebebi" value={drawerRow.reason} span />
+                  )}
                 </div>
 
                 {/* Products */}
@@ -801,6 +884,65 @@ export default function ReturnsManagementPage() {
                   </div>
                 ) : (
                   <InfoCell label="Ürün" value={drawerRow.product} />
+                )}
+
+                {/* Exchange info */}
+                {drawerRow.request_type === 'exchange' && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Değişim Bilgileri</p>
+                    <div className="rounded-xl border border-border bg-muted/40 divide-y divide-border overflow-hidden mb-3">
+                      <div className="flex items-start gap-3 px-3 py-2.5">
+                        <ArrowLeftRight className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
+                        <div>
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Değişim Türü</p>
+                          <p className="text-xs font-medium text-foreground mt-0.5">
+                            {EXCHANGE_TYPE_LABELS[drawerRow.exchange_type as ExchangeType] ?? '—'}
+                          </p>
+                        </div>
+                      </div>
+                      {drawerRow.exchange_variant && (
+                        <div className="flex items-start gap-3 px-3 py-2.5">
+                          <Package className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              {drawerRow.exchange_type === 'same_product_size' ? 'İstenen Beden'
+                                : drawerRow.exchange_type === 'same_product_color' ? 'İstenen Renk'
+                                : 'İstenen Ürün'}
+                            </p>
+                            <p className="text-xs font-semibold text-foreground mt-0.5">{drawerRow.exchange_variant}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Price difference */}
+                    <div>
+                      <label className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                        Fiyat Farkı (₺)
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={exchangePriceDiff}
+                          onChange={(e) => setExchangePriceDiff(e.target.value)}
+                          placeholder="0"
+                          className="text-xs h-8 flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={savePriceDiff}
+                          disabled={savingPriceDiff}
+                          className="h-8 text-xs px-3 shrink-0"
+                        >
+                          {savingPriceDiff ? '...' : 'Kaydet'}
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        + müşteri ödeme yapar · − mağaza iade eder
+                      </p>
+                    </div>
+                  </div>
                 )}
 
                 {/* Description */}
@@ -877,6 +1019,30 @@ export default function ReturnsManagementPage() {
                     <Check className="h-3.5 w-3.5" />
                     Onayla
                   </Button>
+                  {drawerRow.request_type === 'exchange' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                        onClick={() => updateStatus(drawerRow.id, 'Kargoya Verildi')}
+                        disabled={updatingStatus || drawerRow.status === 'Kargoya Verildi'}
+                      >
+                        <Package className="h-3.5 w-3.5" />
+                        Kargoya Verildi
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                        onClick={() => updateStatus(drawerRow.id, 'Tamamlandı')}
+                        disabled={updatingStatus || drawerRow.status === 'Tamamlandı'}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Tamamlandı
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"

@@ -17,6 +17,15 @@ type ReturnRequest = {
   created_at: string;
   products: { name: string; quantity: number; price: number }[] | null;
   media_urls: string[] | null;
+  request_type: 'return' | 'exchange' | null;
+  exchange_type: 'same_product_size' | 'same_product_color' | 'different_product' | null;
+  exchange_variant: string | null;
+};
+
+const EXCHANGE_TYPE_LABELS: Record<string, string> = {
+  same_product_size: 'Aynı ürün, farklı beden',
+  same_product_color: 'Aynı ürün, farklı renk',
+  different_product: 'Farklı ürün',
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -24,8 +33,11 @@ function StatusBadge({ status }: { status: string }) {
     'Onaylandı': { label: 'Onaylandı', cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
     'Reddedildi': { label: 'Reddedildi', cls: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
     'Yeni Talep': { label: 'İncelemede', cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+    'İncelemede': { label: 'İncelemede', cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+    'Kargoya Verildi': { label: 'Kargoya Verildi', cls: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+    'Tamamlandı': { label: 'Tamamlandı', cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
   };
-  const config = map[status] ?? { label: status, cls: 'bg-muted text-muted-foreground ring-1 ring-border' };
+  const config = map[status] ?? { label: status, cls: 'bg-gray-50 text-gray-600 ring-1 ring-gray-200' };
   return <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${config.cls}`}>{config.label}</span>;
 }
 
@@ -59,23 +71,27 @@ export default function TrackPage() {
 
   const accentColor = settings?.primary_color || '#000000';
 
+  const isExchange = request?.request_type === 'exchange';
+  const isShipped = request?.status === 'Kargoya Verildi';
+  const isCompleted = request?.status === 'Tamamlandı';
+
   const timelineSteps = [
+    { label: 'Talep Oluşturuldu', done: true, icon: Check },
+    { label: 'İnceleme Süreci', done: request ? request.status !== 'Yeni Talep' : false, icon: Clock },
     {
-      label: 'Talep Oluşturuldu',
-      done: true,
-      icon: Check,
-    },
-    {
-      label: 'İnceleme Süreci',
-      done: request ? request.status !== 'Yeni Talep' : false,
-      icon: Clock,
-    },
-    {
-      label: request?.status === 'Onaylandı' ? 'İade Onaylandı' : request?.status === 'Reddedildi' ? 'İade Reddedildi' : 'Karar Bekleniyor',
-      done: request ? request.status === 'Onaylandı' || request.status === 'Reddedildi' : false,
+      label: request?.status === 'Onaylandı' ? (isExchange ? 'Değişim Onaylandı' : 'İade Onaylandı')
+        : request?.status === 'Reddedildi' ? (isExchange ? 'Değişim Reddedildi' : 'İade Reddedildi')
+        : 'Karar Bekleniyor',
+      done: request ? ['Onaylandı', 'Reddedildi', 'Kargoya Verildi', 'Tamamlandı'].includes(request.status) : false,
       rejected: request?.status === 'Reddedildi',
       icon: request?.status === 'Reddedildi' ? X : Check,
     },
+    ...(isExchange ? [{
+      label: isCompleted ? 'Tamamlandı' : isShipped ? 'Kargoya Verildi' : 'Ürün Gönderimi Bekleniyor',
+      done: isShipped || isCompleted,
+      rejected: false,
+      icon: Check,
+    }] : []),
   ];
 
   return (
@@ -166,19 +182,38 @@ export default function TrackPage() {
               {/* Info grid */}
               <div className="grid grid-cols-2 gap-4 rounded-2xl bg-gray-50 p-4 border border-gray-100">
                 <div>
-                  <p className="text-xs text-gray-500">Sebep</p>
-                  <p className="font-semibold text-sm mt-0.5">{request.reason}</p>
+                  <p className="text-xs text-gray-500">Talep Türü</p>
+                  <p className="font-semibold text-sm mt-0.5">{request.request_type === 'exchange' ? 'Değişim' : 'İade'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Tutar</p>
                   <p className="font-semibold text-sm mt-0.5">₺{Number(request.amount).toLocaleString('tr-TR')}</p>
                 </div>
+                {request.request_type === 'exchange' && request.exchange_type ? (
+                  <>
+                    <div>
+                      <p className="text-xs text-gray-500">Değişim Türü</p>
+                      <p className="font-semibold text-sm mt-0.5">{EXCHANGE_TYPE_LABELS[request.exchange_type] ?? request.exchange_type}</p>
+                    </div>
+                    {request.exchange_variant && (
+                      <div>
+                        <p className="text-xs text-gray-500">İstenen</p>
+                        <p className="font-semibold text-sm mt-0.5">{request.exchange_variant}</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-500">Sebep</p>
+                    <p className="font-semibold text-sm mt-0.5">{request.reason}</p>
+                  </div>
+                )}
               </div>
 
               {/* Products */}
               {request.products && request.products.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-2">İade Edilen Ürünler</p>
+                  <p className="text-xs font-medium text-gray-500 mb-2">{request.request_type === 'exchange' ? 'Değişim Ürünleri' : 'İade Edilen Ürünler'}</p>
                   <div className="space-y-2">
                     {request.products.map((item, index) => (
                       <div key={index} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
@@ -214,7 +249,7 @@ export default function TrackPage() {
 
               {/* Timeline */}
               <div className="rounded-2xl bg-gray-50 border border-gray-100 p-5">
-                <p className="text-xs font-semibold text-gray-600 mb-4">İade Süreci</p>
+                <p className="text-xs font-semibold text-gray-600 mb-4">{request.request_type === 'exchange' ? 'Değişim Süreci' : 'İade Süreci'}</p>
                 <div className="space-y-4">
                   {timelineSteps.map((s, i) => {
                     const Icon = s.icon;

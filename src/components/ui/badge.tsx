@@ -12,6 +12,7 @@ const badgeVariants = cva(
         approved: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
         rejected: 'bg-red-50 text-red-700 ring-red-200',
         secondary: 'bg-muted text-muted-foreground ring-border',
+        shipped: 'bg-blue-50 text-blue-700 ring-blue-200',
         outline: 'bg-transparent text-foreground ring-border',
       },
     },

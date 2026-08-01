@@ -19,7 +19,11 @@ type ReturnRow = {
   amount: string;
   created_at: string;
   products: { name: string; quantity: number; price: number }[] | null;
+  request_type: 'return' | 'exchange' | null;
+  exchange_type: string | null;
 };
+
+type AnalyticsTab = 'all' | 'return' | 'exchange';
 
 type RangeFilter = '7d' | '30d' | '90d' | 'all' | 'custom';
 type Grouping = 'day' | 'week' | 'month';
@@ -122,7 +126,7 @@ function ChartTooltip(props: Record<string, unknown>) {
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg text-xs">
       <p className="font-medium text-foreground mb-0.5">{label}</p>
-      <p className="text-muted-foreground">{payload[0].value} iade</p>
+      <p className="text-muted-foreground">{payload[0].value} talep</p>
     </div>
   );
 }
@@ -170,6 +174,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('all');
   const [rangeFilter, setRangeFilter] = useState<RangeFilter>('30d');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -209,10 +214,12 @@ export default function AnalyticsPage() {
   const rangeStart = useMemo(() => getRangeStart(rangeFilter, customStart), [rangeFilter, customStart]);
   const rangeEnd = useMemo(() => getRangeEnd(rangeFilter, customEnd), [rangeFilter, customEnd]);
 
-  const filtered = useMemo(
-    () => rows.filter((r) => { const d = new Date(r.created_at); return d >= rangeStart && d <= rangeEnd; }),
-    [rows, rangeStart, rangeEnd],
-  );
+  const filtered = useMemo(() => {
+    let r = rows.filter((x) => { const d = new Date(x.created_at); return d >= rangeStart && d <= rangeEnd; });
+    if (analyticsTab === 'return') r = r.filter((x) => (x.request_type ?? 'return') === 'return');
+    if (analyticsTab === 'exchange') r = r.filter((x) => x.request_type === 'exchange');
+    return r;
+  }, [rows, rangeStart, rangeEnd, analyticsTab]);
 
   const prevFiltered = useMemo(() => {
     if (rangeFilter === 'all') return null;
@@ -235,11 +242,23 @@ export default function AnalyticsPage() {
   );
   const avgAmount = filtered.length > 0 ? totalAmount / filtered.length : 0;
 
+  const EXCHANGE_TYPE_LABELS: Record<string, string> = {
+    same_product_size: 'Farklı beden',
+    same_product_color: 'Farklı renk',
+    different_product: 'Farklı ürün',
+  };
+
   const reasonCounts = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const r of filtered) map[r.reason] = (map[r.reason] || 0) + 1;
+    for (const r of filtered) {
+      const key = analyticsTab === 'exchange' && r.exchange_type
+        ? (EXCHANGE_TYPE_LABELS[r.exchange_type] ?? r.exchange_type)
+        : r.reason;
+      map[key] = (map[key] || 0) + 1;
+    }
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [filtered]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, analyticsTab]);
 
   const productStats = useMemo(() => {
     const map: Record<string, { count: number; amount: number }> = {};
@@ -337,12 +356,22 @@ export default function AnalyticsPage() {
 
   // ── Layout ────────────────────────────────────────────────────────────────────
 
-  const overviewStats = [
-    { label: 'Toplam İade', value: filtered.length },
-    { label: 'Bekleyen', value: pending },
-    { label: 'Onaylanan', value: approved },
-    { label: 'Reddedilen', value: rejected },
-  ];
+  const exchangeCount = useMemo(() => filtered.filter((r) => r.request_type === 'exchange').length, [filtered]);
+  const returnCount = useMemo(() => filtered.filter((r) => (r.request_type ?? 'return') === 'return').length, [filtered]);
+
+  const overviewStats = analyticsTab === 'all'
+    ? [
+        { label: 'Toplam Talep', value: filtered.length },
+        { label: 'İade', value: returnCount },
+        { label: 'Değişim', value: exchangeCount },
+        { label: 'Bekleyen', value: pending },
+      ]
+    : [
+        { label: analyticsTab === 'exchange' ? 'Toplam Değişim' : 'Toplam İade', value: filtered.length },
+        { label: 'Bekleyen', value: pending },
+        { label: 'Onaylanan', value: approved },
+        { label: 'Reddedilen', value: rejected },
+      ];
 
   const isEmpty = !loading && filtered.length === 0;
 
@@ -353,7 +382,26 @@ export default function AnalyticsPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Analiz</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">İade verilerinden otomatik oluşturulan istatistikler.</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">İade ve değişim verilerinden otomatik oluşturulan istatistikler.</p>
+
+            {/* Analytics type tab */}
+            <div className="mt-3 flex rounded-lg border border-border overflow-hidden text-xs font-medium w-fit">
+              {([
+                { value: 'all', label: 'Tümü' },
+                { value: 'return', label: 'İadeler' },
+                { value: 'exchange', label: 'Değişimler' },
+              ] as { value: AnalyticsTab; label: string }[]).map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => setAnalyticsTab(t.value)}
+                  className={`px-4 py-1.5 transition-colors ${
+                    analyticsTab === t.value ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-col gap-2 sm:items-end">
@@ -441,8 +489,10 @@ export default function AnalyticsPage() {
             <div className="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
               <div className="flex items-center justify-between border-b border-border p-4">
                 <div>
-                  <h2 className="text-sm font-semibold">İade Trendi</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Seçili dönemde iade hacmi</p>
+                  <h2 className="text-sm font-semibold">
+                    {analyticsTab === 'exchange' ? 'Değişim Trendi' : analyticsTab === 'return' ? 'İade Trendi' : 'Talep Trendi'}
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Seçili dönemde talep hacmi</p>
                 </div>
                 <div className="flex gap-1.5">
                   {(['day', 'week', 'month'] as Grouping[]).map((g) => (
@@ -491,8 +541,8 @@ export default function AnalyticsPage() {
               {/* Reasons */}
               <div className="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
                 <div className="border-b border-border p-4">
-                  <h2 className="text-sm font-semibold">İade Sebepleri</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Sebebine göre dağılım</p>
+                  <h2 className="text-sm font-semibold">{analyticsTab === 'exchange' ? 'Değişim Türleri' : 'İade Sebepleri'}</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Türüne göre dağılım</p>
                 </div>
                 <div className="p-4">
                   {!mounted ? (

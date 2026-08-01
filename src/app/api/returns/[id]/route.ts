@@ -21,6 +21,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if ('status' in body) update.status = body.status;
   if ('admin_note' in body) update.admin_note = body.admin_note;
   if ('priority' in body) update.priority = body.priority;
+  if ('exchange_price_diff' in body) update.exchange_price_diff = body.exchange_price_diff;
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });

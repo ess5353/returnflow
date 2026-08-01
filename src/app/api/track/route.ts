@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from('return_requests')
-    .select('id, rf_number, order_id, customer_name, reason, description, admin_note, amount, status, created_at, products, media_urls')
+    .select('id, rf_number, order_id, customer_name, reason, description, admin_note, amount, status, created_at, products, media_urls, request_type, exchange_type, exchange_variant')
     .or(`order_id.eq.${q},rf_number.eq.${q}`)
     .ilike('customer_email', email);
 
