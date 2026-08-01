@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createNotification } from '@/lib/notifications/create';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -8,6 +9,7 @@ type ReturnRow = {
   id: string;
   merchant_id: string;
   order_id: string;
+  rf_number: string;
   customer_name: string;
   customer_email: string | null;
   product: string;
@@ -180,6 +182,14 @@ export async function POST(request: NextRequest) {
       action_taken: newStatus,
     },
   ]);
+
+  createNotification({
+    merchantId: returnRow.merchant_id,
+    type: 'automation_triggered',
+    title: `Otomasyon: ${matchedRule.name}`,
+    message: `${notePrefix} · ${returnRow.rf_number}`,
+    relatedReturnId: return_id,
+  });
 
   return NextResponse.json({ evaluated: true, matched: true, action: newStatus, rule: matchedRule.name });
 }

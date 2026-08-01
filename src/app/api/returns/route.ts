@@ -4,6 +4,7 @@ import { getUserFromRequest } from '@/lib/auth-helpers';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createNotification } from '@/lib/notifications/create';
 
 // ── GET: list all returns for the authenticated merchant ───────────────────
 export async function GET(request: NextRequest) {
@@ -134,6 +135,14 @@ export async function POST(request: NextRequest) {
     console.error('returns POST insert error:', insertError);
     return NextResponse.json({ error: 'Failed to create return' }, { status: 500 });
   }
+
+  createNotification({
+    merchantId: merchant_id,
+    type: rType === 'exchange' ? 'new_exchange' : 'new_return',
+    title: rType === 'exchange' ? `Yeni Değişim: ${rf_number}` : `Yeni İade: ${rf_number}`,
+    message: `${customer_name} · Sipariş ${order_id}`,
+    relatedReturnId: inserted.id,
+  });
 
   return NextResponse.json({ data: inserted });
 }
