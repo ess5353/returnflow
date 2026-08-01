@@ -19,6 +19,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileX,
   Filter,
   MessageSquare,
@@ -34,6 +35,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ExportModal } from '@/components/returns/export-modal';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -393,6 +395,9 @@ export default function ReturnsManagementPage() {
   const [exchangePriceDiff, setExchangePriceDiff] = useState('');
   const [savingPriceDiff, setSavingPriceDiff] = useState(false);
 
+  // Export
+  const [exportOpen, setExportOpen] = useState(false);
+
 
   const [token, setToken] = useState<string | null>(null);
   const [automationLogs, setAutomationLogs] = useState<AutomationLog[]>([]);
@@ -687,15 +692,26 @@ export default function ReturnsManagementPage() {
                 <h1 className="text-2xl font-bold tracking-tight">İade & Değişim Yönetimi</h1>
                 <p className="mt-0.5 text-sm text-muted-foreground">Tüm iade ve değişim taleplerini görüntüleyin, filtreleyin ve yönetin.</p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { if (token) { setLoading(true); fetchRows(token); } }}
-                className="shrink-0 gap-2"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Yenile
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExportOpen(true)}
+                  className="gap-2"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Dışa Aktar
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { if (token) { setLoading(true); fetchRows(token); } }}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Yenile
+                </Button>
+              </div>
             </div>
 
             {/* Type tab */}
@@ -1297,6 +1313,9 @@ export default function ReturnsManagementPage() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {/* Export modal */}
+      <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} token={token ?? ''} />
 
       {/* Image lightbox */}
       <Dialog.Root open={!!lightboxUrl} onOpenChange={(open) => { if (!open) setLightboxUrl(null); }}>
