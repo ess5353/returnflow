@@ -7,15 +7,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // ── GET: list all returns for the authenticated merchant ───────────────────
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization') ?? '(none)';
-  console.error('[DEBUG GET] Authorization header present:', authHeader !== '(none)');
-
   const user = getUserFromRequest(request);
-  console.error('[DEBUG GET] user from JWT:', JSON.stringify(user));
-
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  console.error('[DEBUG GET] querying with merchantId:', user.merchantId);
 
   const { data, error } = await supabaseAdmin
     .from('return_requests')
@@ -24,12 +17,9 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('[DEBUG GET] Supabase error:', JSON.stringify(error));
+    console.error('returns GET error:', error);
     return NextResponse.json({ error: 'Failed to load returns' }, { status: 500 });
   }
-
-  console.error('[DEBUG GET] rows returned:', data?.length ?? 0);
-  console.error('[DEBUG GET] first row merchant_id:', data?.[0]?.merchant_id ?? '(no rows)');
 
   return NextResponse.json({ data: data ?? [] });
 }
@@ -75,10 +65,9 @@ export async function POST(request: NextRequest) {
   }
 
   if (!merchant_id) {
+    console.error('returns POST: merchant_id could not be resolved');
     return NextResponse.json({ error: 'Merchant not found' }, { status: 500 });
   }
-
-  console.error('[DEBUG] activeMerchantId:', JSON.stringify(merchant_id));
 
   // Check for duplicate (one return per order per merchant)
   const { data: existing } = await supabaseAdmin
@@ -120,8 +109,6 @@ export async function POST(request: NextRequest) {
     media_urls: media_urls ?? [],
   };
 
-  console.error('[DEBUG] insertPayload:', JSON.stringify(insertPayload));
-
   const { data: inserted, error: insertError } = await supabaseAdmin
     .from('return_requests')
     .insert([insertPayload])
@@ -129,11 +116,9 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (insertError) {
-    console.error('[DEBUG] insertError:', JSON.stringify(insertError));
+    console.error('returns POST insert error:', insertError);
     return NextResponse.json({ error: 'Failed to create return' }, { status: 500 });
   }
-
-  console.error('[DEBUG] inserted row:', JSON.stringify(inserted));
 
   return NextResponse.json({ data: inserted });
 }

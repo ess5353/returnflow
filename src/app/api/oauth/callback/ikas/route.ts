@@ -53,11 +53,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid state parameter' }, { status: 400 });
     }
 
-console.log("CLIENT_ID:", config.oauth.clientId);
-console.log("REDIRECT_URI:", getRedirectUri(request.headers.get('host')!));
-console.log("STORE_NAME:", session.storeName);
-
-
     // Exchange authorization code for access/refresh tokens
     const tokenResponse = await OAuthAPI.getTokenWithAuthorizationCode(
       {
@@ -92,8 +87,7 @@ console.log("STORE_NAME:", session.storeName);
 
     // Fetch merchant and authorized app details
     const [merchantResponse, authorizedAppResponse] = await Promise.all([ikas.queries.getMerchant(), ikas.queries.getAuthorizedApp()]);
-console.log("merchantResponse", merchantResponse);
-console.log("authorizedAppResponse", authorizedAppResponse);
+
     // Validate responses
     if (
       !merchantResponse.isSuccess ||
@@ -127,12 +121,12 @@ console.log("authorizedAppResponse", authorizedAppResponse);
     } as AuthToken;
 
     // Store the token for future use
-    try {await AuthTokenManager.put(token);
-   console.log("TOKEN SAVED");
-  } catch (e) {
-    console.error("TOKEN SAVE ERROR:",e);
-  }
-  
+    try {
+      await AuthTokenManager.put(token);
+    } catch (e) {
+      console.error('OAuth callback: failed to save token:', e);
+    }
+
 
     // Update session with new merchant and app IDs, clear state, and set expiration
     session.expiresAt = new Date(Date.now() + 3600 * 1000);
