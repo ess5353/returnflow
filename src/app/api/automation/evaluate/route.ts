@@ -32,7 +32,7 @@ type AutomationRule = {
   priority: number;
   condition_logic: 'AND' | 'OR';
   conditions: Condition[];
-  action: 'auto_approve' | 'auto_reject';
+  action: 'auto_approve' | 'auto_reject' | 'move_to_review';
   action_note: string | null;
 };
 
@@ -148,8 +148,18 @@ export async function POST(request: NextRequest) {
   }
 
   // Apply action
-  const newStatus = matchedRule.action === 'auto_approve' ? 'Onaylandı' : 'Reddedildi';
-  const notePrefix = matchedRule.action === 'auto_approve' ? 'Otomatik onaylandı' : 'Otomatik reddedildi';
+  const ACTION_STATUS: Record<string, string> = {
+    auto_approve: 'Onaylandı',
+    auto_reject: 'Reddedildi',
+    move_to_review: 'İncelemede',
+  };
+  const ACTION_NOTE_PREFIX: Record<string, string> = {
+    auto_approve: 'Otomatik onaylandı',
+    auto_reject: 'Otomatik reddedildi',
+    move_to_review: 'İncelemeye gönderildi',
+  };
+  const newStatus = ACTION_STATUS[matchedRule.action] ?? 'İncelemede';
+  const notePrefix = ACTION_NOTE_PREFIX[matchedRule.action] ?? 'İşlem uygulandı';
   const adminNote = matchedRule.action_note
     ? `[${notePrefix}] ${matchedRule.action_note}`
     : `[${notePrefix}] Kural: ${matchedRule.name}`;

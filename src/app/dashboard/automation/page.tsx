@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
-import { Check, ChevronDown, ChevronUp, Plus, Trash2, X, Zap } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clock, Copy, Plus, Trash2, X, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,19 +29,23 @@ type AutomationRule = {
   priority: number;
   condition_logic: 'AND' | 'OR';
   conditions: Condition[];
-  action: 'auto_approve' | 'auto_reject';
+  action: 'auto_approve' | 'auto_reject' | 'move_to_review';
   action_note: string | null;
   created_at: string;
 };
 
-// ─── Engine config (extensible: add new fields/operators here) ────────────────
+type RuleStats = Record<string, { count: number; last_triggered: string | null }>;
+
+// ─── Engine config ─────────────────────────────────────────────────────────────
 
 type FieldType = 'number' | 'text' | 'reason_select' | 'presence';
 
 const FIELDS: { value: string; label: string; type: FieldType }[] = [
   { value: 'amount', label: 'İade Tutarı', type: 'number' },
   { value: 'reason', label: 'İade Sebebi', type: 'reason_select' },
+  { value: 'customer_name', label: 'Müşteri Adı', type: 'text' },
   { value: 'customer_email', label: 'Müşteri E-postası', type: 'text' },
+  { value: 'order_id', label: 'Sipariş No', type: 'text' },
   { value: 'product', label: 'Ürün Adı', type: 'text' },
   { value: 'description', label: 'Müşteri Notu', type: 'text' },
   { value: 'media_urls', label: 'Fotoğraf / Video', type: 'presence' },
@@ -60,6 +64,8 @@ const OPERATORS: Record<FieldType, { value: string; label: string }[]> = {
     { value: 'not_contains', label: 'içermez' },
     { value: 'eq', label: 'eşittir' },
     { value: 'ends_with', label: 'ile biter' },
+    { value: 'is_empty', label: 'boş' },
+    { value: 'is_not_empty', label: 'dolu' },
   ],
   reason_select: [
     { value: 'eq', label: 'eşittir' },
@@ -85,8 +91,6 @@ function needsValueInput(operator: string): boolean {
   return operator !== 'is_empty' && operator !== 'is_not_empty';
 }
 
-// ─── Condition summary helper ─────────────────────────────────────────────────
-
 function conditionSummary(c: Condition): string {
   const fieldLabel = FIELDS.find((f) => f.value === c.field)?.label ?? c.field;
   const ft = fieldType(c.field);
@@ -95,8 +99,6 @@ function conditionSummary(c: Condition): string {
   const valueLabel = c.field === 'amount' ? `₺${c.value}` : c.value;
   return `${fieldLabel} ${opLabel} ${valueLabel}`;
 }
-
-// ─── Empty condition ──────────────────────────────────────────────────────────
 
 function emptyCondition(): Condition {
   return { field: 'amount', operator: 'lt', value: '' };
@@ -114,18 +116,42 @@ function emptyRule(): Omit<AutomationRule, 'id' | 'created_at'> {
   };
 }
 
-// ─── Condition row editor ─────────────────────────────────────────────────────
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Az önce';
+  if (mins < 60) return `${mins} dk önce`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} sa önce`;
+  const days = Math.floor(hours / 24);
+  return `${days} gün önce`;
+}
+
+function validateCondition(c: Condition): boolean {
+  if (!needsValueInput(c.operator)) return true;
+  const val = c.value.trim();
+  if (!val) return false;
+  if (fieldType(c.field) === 'number') {
+    const n = Number(val);
+    return !isNaN(n) && isFinite(n);
+  }
+  return true;
+}
+
+// ─── Condition row ─────────────────────────────────────────────────────────────
 
 function ConditionRow({
   condition,
   onChange,
   onRemove,
   canRemove,
+  hasError,
 }: {
   condition: Condition;
   onChange: (c: Condition) => void;
   onRemove: () => void;
   canRemove: boolean;
+  hasError: boolean;
 }) {
   const ft = fieldType(condition.field);
 
@@ -139,8 +165,10 @@ function ConditionRow({
   };
 
   return (
-    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-      {/* Field selector */}
+    <div className={cn(
+      'flex items-center gap-2 flex-wrap sm:flex-nowrap rounded-lg p-1',
+      hasError && 'ring-1 ring-destructive/50 bg-destructive/5',
+    )}>
       <select
         value={condition.field}
         onChange={(e) => handleFieldChange(e.target.value)}
@@ -151,7 +179,6 @@ function ConditionRow({
         ))}
       </select>
 
-      {/* Operator selector */}
       <select
         value={condition.operator}
         onChange={(e) => handleOperatorChange(e.target.value)}
@@ -162,7 +189,6 @@ function ConditionRow({
         ))}
       </select>
 
-      {/* Value input */}
       {needsValueInput(condition.operator) && (
         ft === 'reason_select' ? (
           <select
@@ -194,7 +220,6 @@ function ConditionRow({
         )
       )}
 
-      {/* Remove button */}
       <button
         onClick={onRemove}
         disabled={!canRemove}
@@ -207,27 +232,48 @@ function ConditionRow({
   );
 }
 
-// ─── Rule card ────────────────────────────────────────────────────────────────
+// ─── Rule card ─────────────────────────────────────────────────────────────────
 
 function RuleCard({
   rule,
   isFirst,
   isLast,
+  ruleStats,
   onEdit,
-  onDelete,
+  onDeleteRequest,
   onToggle,
   onMoveUp,
   onMoveDown,
+  onDuplicate,
 }: {
   rule: AutomationRule;
   isFirst: boolean;
   isLast: boolean;
+  ruleStats: { count: number; last_triggered: string | null } | undefined;
   onEdit: () => void;
-  onDelete: () => void;
+  onDeleteRequest: () => void;
   onToggle: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onDuplicate: () => void;
 }) {
+  const actionBadgeLabel =
+    rule.action === 'auto_approve' ? '✓ Otomatik Onayla' :
+    rule.action === 'auto_reject' ? '✗ Otomatik Reddet' :
+    '→ İncelemeye Gönder';
+
+  const actionBadgeVariant: 'approved' | 'rejected' | 'secondary' =
+    rule.action === 'auto_approve' ? 'approved' :
+    rule.action === 'auto_reject' ? 'rejected' :
+    'secondary';
+
+  const actionColorClass =
+    rule.action === 'auto_approve'
+      ? 'bg-emerald-100 text-emerald-700'
+      : rule.action === 'auto_reject'
+      ? 'bg-red-100 text-red-700'
+      : 'bg-amber-100 text-amber-700';
+
   return (
     <div className={cn(
       'rounded-xl border border-border bg-card p-5 shadow-xs transition-opacity',
@@ -238,30 +284,55 @@ function RuleCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-sm font-semibold text-foreground">{rule.name}</span>
-            <Badge variant={rule.action === 'auto_approve' ? 'approved' : 'rejected'}>
-              {rule.action === 'auto_approve' ? '✓ Otomatik Onayla' : '✗ Otomatik Reddet'}
-            </Badge>
+            <Badge variant={actionBadgeVariant}>{actionBadgeLabel}</Badge>
             {!rule.enabled && <Badge variant="secondary">Pasif</Badge>}
           </div>
 
-          {/* Condition summary */}
+          {/* Condition summary — stacked with logic connectors */}
           {rule.conditions.length > 0 && (
-            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <div className="mt-2.5 space-y-1">
               {rule.conditions.map((c, i) => (
-                <span key={i} className="flex items-center gap-1">
+                <div key={i} className="flex items-center gap-1.5">
+                  {i > 0 ? (
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground/50 w-8 text-right shrink-0">
+                      {rule.condition_logic === 'AND' ? 'VE' : 'VEYA'}
+                    </span>
+                  ) : (
+                    <span className="w-8 shrink-0" />
+                  )}
                   <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                     {conditionSummary(c)}
                   </span>
-                  {i < rule.conditions.length - 1 && (
-                    <span className="text-[10px] font-bold uppercase text-muted-foreground/60">{rule.condition_logic}</span>
-                  )}
-                </span>
+                </div>
               ))}
+              {/* Action arrow */}
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className="text-[10px] text-muted-foreground/40 w-8 text-right shrink-0">↓</span>
+                <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-semibold', actionColorClass)}>
+                  {actionBadgeLabel}
+                </span>
+              </div>
             </div>
           )}
 
           {rule.action_note && (
             <p className="mt-2 text-[11px] text-muted-foreground italic">Not: {rule.action_note}</p>
+          )}
+
+          {/* Stats: last triggered + count */}
+          {ruleStats && ruleStats.count > 0 && (
+            <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                {ruleStats.count} kez uygulandı
+              </span>
+              {ruleStats.last_triggered && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {relativeTime(ruleStats.last_triggered)}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -276,10 +347,13 @@ function RuleCard({
               rule.enabled ? 'bg-primary' : 'bg-muted',
             )}
           >
-            <span className={cn('inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform', rule.enabled ? 'translate-x-4' : 'translate-x-0.5')} />
+            <span className={cn(
+              'inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform',
+              rule.enabled ? 'translate-x-4' : 'translate-x-0.5',
+            )} />
           </button>
 
-          {/* Priority + edit/delete */}
+          {/* Priority + action buttons */}
           <div className="flex items-center gap-1">
             <button
               onClick={onMoveUp}
@@ -297,9 +371,16 @@ function RuleCard({
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
+            <button
+              onClick={onDuplicate}
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors"
+              aria-label="Kopyala"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
             <Button variant="outline" size="sm" onClick={onEdit} className="h-7 px-2.5 text-xs">Düzenle</Button>
             <button
-              onClick={onDelete}
+              onClick={onDeleteRequest}
               className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"
               aria-label="Sil"
             >
@@ -312,7 +393,46 @@ function RuleCard({
   );
 }
 
-// ─── Rule editor drawer ───────────────────────────────────────────────────────
+// ─── Delete confirm dialog ─────────────────────────────────────────────────────
+
+function DeleteConfirmDialog({
+  ruleName,
+  onConfirm,
+  onCancel,
+}: {
+  ruleName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+      <div className="mx-4 w-full max-w-sm rounded-xl border border-border bg-card shadow-2xl p-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold">Kuralı Sil</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              <span className="font-medium">&ldquo;{ruleName}&rdquo;</span> kuralı kalıcı olarak silinecek. Bu işlem geri alınamaz.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onCancel}>İptal</Button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 transition-colors"
+          >
+            Sil
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Rule editor drawer ────────────────────────────────────────────────────────
 
 function RuleEditor({
   open,
@@ -328,12 +448,13 @@ function RuleEditor({
   saving: boolean;
 }) {
   const [draft, setDraft] = useState(initial);
+  const [showErrors, setShowErrors] = useState(false);
   const prevOpenRef = useRef(false);
 
-  // Reset draft when drawer opens with new data
   useEffect(() => {
     if (open && !prevOpenRef.current) {
       setDraft(initial);
+      setShowErrors(false);
     }
     prevOpenRef.current = open;
   }, [open, initial]);
@@ -352,14 +473,22 @@ function RuleEditor({
   const removeCondition = (i: number) =>
     setDraft((d) => ({ ...d, conditions: d.conditions.filter((_, idx) => idx !== i) }));
 
-  const isValid = draft.name.trim().length > 0 && draft.conditions.length > 0 && draft.action;
+  const isNameValid = draft.name.trim().length > 0;
+  const conditionErrors = draft.conditions.map((c) => !validateCondition(c));
+  const isValid = isNameValid && draft.conditions.length > 0 && !!draft.action && conditionErrors.every((e) => !e);
+
+  const handleSaveClick = async () => {
+    if (!isValid) {
+      setShowErrors(true);
+      return;
+    }
+    await onSave(draft);
+  };
 
   return (
     <>
-      {/* Backdrop */}
       {open && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={onClose} />}
 
-      {/* Drawer */}
       <div
         className={cn(
           'fixed right-0 top-0 h-full w-full max-w-[480px] bg-card border-l border-border shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-in-out',
@@ -368,7 +497,7 @@ function RuleEditor({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4 shrink-0">
-          <h2 className="text-sm font-semibold">Kural Düzenle</h2>
+          <h2 className="text-sm font-semibold">{initial.name ? 'Kuralı Düzenle' : 'Yeni Kural'}</h2>
           <button
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors"
@@ -382,13 +511,18 @@ function RuleEditor({
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
           {/* Name */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Kural Adı</label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+              Kural Adı <span className="text-destructive">*</span>
+            </label>
             <Input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
               placeholder="Örn: Düşük Tutarlı Otomatik Onay"
-              className="text-sm"
+              className={cn('text-sm', showErrors && !isNameValid && 'border-destructive focus-visible:ring-destructive')}
             />
+            {showErrors && !isNameValid && (
+              <p className="mt-1 text-[11px] text-destructive">Kural adı gereklidir.</p>
+            )}
           </div>
 
           {/* Active toggle */}
@@ -405,15 +539,19 @@ function RuleEditor({
                 draft.enabled ? 'bg-primary' : 'bg-muted',
               )}
             >
-              <span className={cn('inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform', draft.enabled ? 'translate-x-4' : 'translate-x-0.5')} />
+              <span className={cn(
+                'inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform',
+                draft.enabled ? 'translate-x-4' : 'translate-x-0.5',
+              )} />
             </button>
           </div>
 
           {/* Conditions */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Koşullar</p>
-              {/* AND / OR toggle */}
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Koşullar <span className="text-destructive">*</span>
+              </p>
               <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
                 {(['AND', 'OR'] as const).map((l) => (
                   <button
@@ -438,9 +576,13 @@ function RuleEditor({
                   onChange={(updated) => updateCondition(i, updated)}
                   onRemove={() => removeCondition(i)}
                   canRemove={draft.conditions.length > 1}
+                  hasError={showErrors && conditionErrors[i]}
                 />
               ))}
             </div>
+            {showErrors && conditionErrors.some(Boolean) && (
+              <p className="mt-1 text-[11px] text-destructive">Tüm koşul değerleri dolu ve geçerli olmalıdır.</p>
+            )}
 
             <button
               onClick={addCondition}
@@ -453,31 +595,45 @@ function RuleEditor({
 
           {/* Action */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Eylem</p>
-            <div className="grid grid-cols-2 gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              Eylem <span className="text-destructive">*</span>
+            </p>
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setDraft((d) => ({ ...d, action: 'auto_approve' }))}
                 className={cn(
-                  'flex flex-col items-center gap-1.5 rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-colors',
+                  'flex flex-col items-center gap-1.5 rounded-xl border-2 px-3 py-3 text-xs font-semibold transition-colors',
                   draft.action === 'auto_approve'
                     ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                     : 'border-border text-muted-foreground hover:border-muted-foreground',
                 )}
               >
-                <Check className="h-5 w-5" />
-                Otomatik Onayla
+                <Check className="h-4 w-4" />
+                Onayla
               </button>
               <button
                 onClick={() => setDraft((d) => ({ ...d, action: 'auto_reject' }))}
                 className={cn(
-                  'flex flex-col items-center gap-1.5 rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-colors',
+                  'flex flex-col items-center gap-1.5 rounded-xl border-2 px-3 py-3 text-xs font-semibold transition-colors',
                   draft.action === 'auto_reject'
                     ? 'border-red-400 bg-red-50 text-red-700'
                     : 'border-border text-muted-foreground hover:border-muted-foreground',
                 )}
               >
-                <X className="h-5 w-5" />
-                Otomatik Reddet
+                <X className="h-4 w-4" />
+                Reddet
+              </button>
+              <button
+                onClick={() => setDraft((d) => ({ ...d, action: 'move_to_review' }))}
+                className={cn(
+                  'flex flex-col items-center gap-1.5 rounded-xl border-2 px-3 py-3 text-xs font-semibold transition-colors',
+                  draft.action === 'move_to_review'
+                    ? 'border-amber-400 bg-amber-50 text-amber-700'
+                    : 'border-border text-muted-foreground hover:border-muted-foreground',
+                )}
+              >
+                <Zap className="h-4 w-4" />
+                İncelemeye Gönder
               </button>
             </div>
           </div>
@@ -500,7 +656,7 @@ function RuleEditor({
         {/* Footer */}
         <div className="border-t border-border px-5 py-4 flex gap-2 shrink-0">
           <Button variant="outline" className="flex-1" onClick={onClose}>İptal</Button>
-          <Button className="flex-1" onClick={() => onSave(draft)} disabled={saving || !isValid}>
+          <Button className="flex-1" onClick={handleSaveClick} disabled={saving}>
             {saving ? 'Kaydediliyor...' : 'Kaydet'}
           </Button>
         </div>
@@ -509,15 +665,17 @@ function RuleEditor({
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AutomationPage() {
   const [token, setToken] = useState<string | null>(null);
   const [rules, setRules] = useState<AutomationRule[]>([]);
+  const [stats, setStats] = useState<RuleStats>({});
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { settings, loadSettings } = useStoreSettings();
 
   const fetchRules = useCallback(async (t: string) => {
@@ -528,6 +686,13 @@ export default function AutomationPage() {
     setLoading(false);
   }, []);
 
+  const fetchStats = useCallback(async (t: string) => {
+    const res = await fetch('/api/automation/stats', { headers: { Authorization: `JWT ${t}` } });
+    if (!res.ok) return;
+    const { data } = await res.json();
+    setStats(data ?? {});
+  }, []);
+
   useEffect(() => {
     AppBridgeHelper.closeLoader();
   }, []);
@@ -536,7 +701,11 @@ export default function AutomationPage() {
     const init = async () => {
       const t = await TokenHelpers.getTokenForIframeApp();
       setToken(t);
-      if (t) await fetchRules(t);
+      if (t) {
+        await Promise.all([fetchRules(t), fetchStats(t)]);
+      } else {
+        setLoading(false);
+      }
       await loadSettings();
     };
     init();
@@ -560,7 +729,6 @@ export default function AutomationPage() {
     setSaving(true);
 
     if (editingRule) {
-      // Update existing
       const res = await fetch(`/api/automation/rules/${editingRule.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
@@ -570,7 +738,6 @@ export default function AutomationPage() {
       if (!res.ok) { toast('Kural güncellenemedi', 'error'); return; }
       toast('Kural güncellendi', 'success');
     } else {
-      // Create new
       const res = await fetch('/api/automation/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
@@ -585,9 +752,13 @@ export default function AutomationPage() {
     await fetchRules(token);
   };
 
-  const handleDelete = async (rule: AutomationRule) => {
-    if (!token) return;
-    const res = await fetch(`/api/automation/rules/${rule.id}`, {
+  const handleDeleteRequest = (id: string) => setConfirmDeleteId(id);
+
+  const handleDeleteConfirm = async () => {
+    if (!token || !confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
+    const res = await fetch(`/api/automation/rules/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `JWT ${token}` },
     });
@@ -610,26 +781,49 @@ export default function AutomationPage() {
   const handleMove = async (rule: AutomationRule, direction: 'up' | 'down') => {
     if (!token) return;
     const idx = rules.findIndex((r) => r.id === rule.id);
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= rules.length) return;
-    const swapRule = rules[swapIdx];
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= rules.length) return;
 
-    // Swap priorities
-    await Promise.all([
-      fetch(`/api/automation/rules/${rule.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
-        body: JSON.stringify({ priority: swapRule.priority }),
-      }),
-      fetch(`/api/automation/rules/${swapRule.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
-        body: JSON.stringify({ priority: rule.priority }),
-      }),
-    ]);
+    // Reorder and assign sequential priorities to prevent duplicates
+    const reordered = [...rules];
+    const [moved] = reordered.splice(idx, 1);
+    reordered.splice(newIdx, 0, moved);
+
+    await Promise.all(
+      reordered.map((r, i) =>
+        fetch(`/api/automation/rules/${r.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+          body: JSON.stringify({ priority: i }),
+        })
+      )
+    );
 
     await fetchRules(token);
   };
+
+  const handleDuplicate = async (rule: AutomationRule) => {
+    if (!token) return;
+    const draft = {
+      name: `${rule.name} (Kopya)`,
+      enabled: false,
+      priority: rules.length,
+      condition_logic: rule.condition_logic,
+      conditions: rule.conditions,
+      action: rule.action,
+      action_note: rule.action_note,
+    };
+    const res = await fetch('/api/automation/rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify(draft),
+    });
+    if (!res.ok) { toast('Kural kopyalanamadı', 'error'); return; }
+    toast('Kural kopyalandı (pasif olarak eklendi)', 'success');
+    await fetchRules(token);
+  };
+
+  const confirmDeleteRule = rules.find((r) => r.id === confirmDeleteId);
 
   const drawerInitial: Omit<AutomationRule, 'id' | 'created_at'> = editingRule
     ? {
@@ -654,7 +848,7 @@ export default function AutomationPage() {
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">Otomasyon Kuralları</h1>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Koşullara göre iadeleri otomatik olarak onayla veya reddet.
+                  Koşullara göre iadeleri otomatik olarak onayla, reddet veya incelemeye gönder.
                 </p>
               </div>
               <Button size="sm" onClick={openNew} className="shrink-0 gap-2">
@@ -683,7 +877,8 @@ export default function AutomationPage() {
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="rounded-xl border border-border bg-card p-5">
                     <Skeleton className="h-4 w-48 mb-3" />
-                    <Skeleton className="h-3 w-72" />
+                    <Skeleton className="h-3 w-72 mb-2" />
+                    <Skeleton className="h-3 w-56" />
                   </div>
                 ))}
               </div>
@@ -698,8 +893,8 @@ export default function AutomationPage() {
                   <p className="text-xs font-medium text-muted-foreground">Örnek kurallar:</p>
                   {[
                     { label: 'Düşük Tutarlı Otomatik Onay', summary: 'Tutar < ₺100 → Onayla' },
-                    { label: 'Kanıtsız Talep Reddi', summary: 'Fotoğraf mevcut değil VE Not boş → Reddet' },
-                    { label: 'Hasar Otomatik Onay', summary: 'Sebep = Hasarlı geldi → Onayla' },
+                    { label: 'Kanıtsız Talep Reddi', summary: 'Fotoğraf yok VE Not boş → Reddet' },
+                    { label: 'Hasar Otomatik İnceleme', summary: 'Sebep = Hasarlı geldi → İncelemeye Gönder' },
                   ].map((ex) => (
                     <div key={ex.label} className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
                       <p className="text-xs font-semibold">{ex.label}</p>
@@ -720,11 +915,13 @@ export default function AutomationPage() {
                     rule={rule}
                     isFirst={idx === 0}
                     isLast={idx === rules.length - 1}
+                    ruleStats={stats[rule.id]}
                     onEdit={() => openEdit(rule)}
-                    onDelete={() => handleDelete(rule)}
+                    onDeleteRequest={() => handleDeleteRequest(rule.id)}
                     onToggle={() => handleToggle(rule)}
                     onMoveUp={() => handleMove(rule, 'up')}
                     onMoveDown={() => handleMove(rule, 'down')}
+                    onDuplicate={() => handleDuplicate(rule)}
                   />
                 ))}
 
@@ -745,6 +942,15 @@ export default function AutomationPage() {
           saving={saving}
         />
       </div>
+
+      {/* Delete confirmation dialog */}
+      {confirmDeleteId && confirmDeleteRule && (
+        <DeleteConfirmDialog
+          ruleName={confirmDeleteRule.name}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     </DashboardShell>
   );
 }
