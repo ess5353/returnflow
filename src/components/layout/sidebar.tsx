@@ -4,12 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { ArrowLeftRight, BarChart2, Bell, BookOpen, ChevronLeft, ChevronRight, Globe, Key, LayoutDashboard, LayoutList, Mail, Settings, Zap } from 'lucide-react';
+import { ArrowLeftRight, BarChart2, Bell, BookOpen, Brain, ChevronLeft, ChevronRight, Globe, Key, LayoutDashboard, LayoutList, Mail, Settings, Zap } from 'lucide-react';
 
 const NAV = [
   { href: '/dashboard', label: 'Genel Bakış', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/returns-management', label: 'İade Yönetimi', icon: LayoutList, exact: false },
   { href: '/dashboard/analytics', label: 'Analiz', icon: BarChart2, exact: false },
+  { href: '/dashboard/insights', label: 'AI Insights', icon: Brain, exact: false },
   { href: '/dashboard/automation', label: 'Otomasyon', icon: Zap, exact: false },
   { href: '/dashboard/notifications', label: 'Bildirimler', icon: Bell, exact: false },
   { href: '/dashboard/email-templates', label: 'E-posta Şablonları', icon: Mail, exact: false },
