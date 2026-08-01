@@ -22,6 +22,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if ('admin_note' in body) update.admin_note = body.admin_note;
   if ('priority' in body) update.priority = body.priority;
   if ('exchange_price_diff' in body) update.exchange_price_diff = body.exchange_price_diff;
+  if ('carrier' in body) update.carrier = body.carrier;
+  if ('tracking_number' in body) update.tracking_number = body.tracking_number;
+  if ('shipping_status' in body) update.shipping_status = body.shipping_status;
+  if ('shipping_date' in body) update.shipping_date = body.shipping_date;
+  if ('delivered_date' in body) update.delivered_date = body.delivered_date;
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });

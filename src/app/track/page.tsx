@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { PublicStoreSettings } from '@/app/api/store-settings/route';
-import { ArrowLeftRight, Check, Clock, X } from 'lucide-react';
+import { ArrowLeftRight, Check, Clock, ExternalLink, Hash, Truck, X } from 'lucide-react';
+import { getCarrierLabel, getShippingStatusLabel, getTrackingUrl } from '@/lib/shipping/carriers';
 
 type ReturnRequest = {
   id: string;
@@ -20,6 +21,11 @@ type ReturnRequest = {
   request_type: 'return' | 'exchange' | null;
   exchange_type: 'same_product_size' | 'same_product_color' | 'different_product' | null;
   exchange_variant: string | null;
+  carrier: string | null;
+  tracking_number: string | null;
+  shipping_status: string | null;
+  shipping_date: string | null;
+  delivered_date: string | null;
 };
 
 const EXCHANGE_TYPE_LABELS: Record<string, string> = {
@@ -268,6 +274,54 @@ export default function TrackPage() {
                   })}
                 </div>
               </div>
+
+              {/* Shipping info */}
+              {(request.carrier || request.tracking_number) && (
+                <div className="rounded-2xl bg-gray-50 border border-gray-100 p-5">
+                  <p className="text-xs font-semibold text-gray-600 mb-3">Kargo Takibi</p>
+                  <div className="space-y-2.5">
+                    {request.carrier && (
+                      <div className="flex items-center gap-2.5">
+                        <Truck className="h-4 w-4 text-gray-400 shrink-0" />
+                        <span className="text-sm font-semibold">{getCarrierLabel(request.carrier)}</span>
+                      </div>
+                    )}
+                    {request.tracking_number && (
+                      <div className="flex items-center gap-2.5">
+                        <Hash className="h-4 w-4 text-gray-400 shrink-0" />
+                        <span className="text-sm font-mono tracking-wide">{request.tracking_number}</span>
+                      </div>
+                    )}
+                    {request.shipping_status && (
+                      <div className="flex items-center gap-2.5">
+                        <div className={`h-2 w-2 rounded-full shrink-0 ${
+                          request.shipping_status === 'delivered' ? 'bg-emerald-500'
+                          : request.shipping_status === 'failed' ? 'bg-red-500'
+                          : request.shipping_status === 'out_for_delivery' ? 'bg-blue-500'
+                          : 'bg-amber-400'
+                        }`} />
+                        <span className="text-sm text-gray-700">{getShippingStatusLabel(request.shipping_status)}</span>
+                      </div>
+                    )}
+                  </div>
+                  {request.carrier && request.tracking_number && (() => {
+                    const url = getTrackingUrl(request.carrier, request.tracking_number);
+                    if (!url) return null;
+                    return (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ background: accentColor }}
+                        className="mt-4 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Kargonu Takip Et
+                      </a>
+                    );
+                  })()}
+                </div>
+              )}
 
               {/* Admin note */}
               {request.admin_note && (
