@@ -453,16 +453,26 @@ export default function ReturnsManagementPage() {
     });
     setUpdatingStatus(false);
     if (!res.ok) { toast('Durum güncellenemedi', 'error'); return; }
-    if (status === 'Onaylandı') {
-      fetch('/api/email/return-approved', {
+
+    const rType = drawerRow?.request_type ?? 'return';
+    const templateMap: Record<string, string> = {
+      Onaylandı: rType === 'exchange' ? 'exchange_approved' : 'return_approved',
+      Reddedildi: rType === 'exchange' ? 'exchange_rejected' : 'return_rejected',
+      Tamamlandı: rType === 'exchange' ? 'exchange_completed' : 'return_completed',
+    };
+    const templateType = templateMap[status];
+    if (templateType) {
+      fetch('/api/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
-        body: JSON.stringify({ return_id: id }),
+        body: JSON.stringify({ return_id: id, template_type: templateType }),
       }).catch(() => {});
     }
+
     await fetchRows(token);
     const label = status === 'Onaylandı' ? 'Talep onaylandı — müşteriye e-posta gönderildi'
-      : status === 'Reddedildi' ? 'Talep reddedildi'
+      : status === 'Reddedildi' ? 'Talep reddedildi — müşteri bilgilendirildi'
+      : status === 'Tamamlandı' ? 'Tamamlandı — müşteriye e-posta gönderildi'
       : 'Durum güncellendi';
     toast(label, 'success');
   };

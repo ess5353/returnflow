@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { ArrowLeftRight, BarChart2, Bell, ChevronLeft, ChevronRight, LayoutDashboard, LayoutList, Settings, Zap } from 'lucide-react';
+import { ArrowLeftRight, BarChart2, Bell, ChevronLeft, ChevronRight, LayoutDashboard, LayoutList, Mail, Settings, Zap } from 'lucide-react';
 
 const NAV = [
   { href: '/dashboard', label: 'Genel Bakış', icon: LayoutDashboard, exact: true },
@@ -12,6 +12,7 @@ const NAV = [
   { href: '/dashboard/analytics', label: 'Analiz', icon: BarChart2, exact: false },
   { href: '/dashboard/automation', label: 'Otomasyon', icon: Zap, exact: false },
   { href: '/dashboard/notifications', label: 'Bildirimler', icon: Bell, exact: false },
+  { href: '/dashboard/email-templates', label: 'E-posta Şablonları', icon: Mail, exact: false },
   { href: '/dashboard/settings', label: 'Ayarlar', icon: Settings, exact: false },
 ];
 
