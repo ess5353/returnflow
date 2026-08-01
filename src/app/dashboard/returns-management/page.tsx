@@ -25,6 +25,7 @@ import {
   Search,
   SlidersHorizontal,
   X,
+  Zap,
   ZoomIn,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,14 @@ type ReturnRow = {
   created_at: string;
   updated_at: string | null;
   media_urls: string[] | null;
+};
+
+type AutomationLog = {
+  id: string;
+  rule_name: string | null;
+  matched: boolean;
+  action_taken: string | null;
+  created_at: string;
 };
 
 type SortKey = 'newest' | 'oldest' | 'amount_desc' | 'amount_asc';
@@ -165,6 +174,59 @@ function ActivityRow({
   );
 }
 
+// ─── Automation activity ──────────────────────────────────────────────────────
+
+function AutomationActivity({ logs, loading }: { logs: AutomationLog[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Otomasyon</p>
+        <Skeleton className="h-14 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (logs.length === 0) return null;
+
+  const matched = logs.find((l) => l.matched);
+
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Otomasyon</p>
+      <div className="rounded-xl border border-border bg-muted/40 divide-y divide-border overflow-hidden">
+        {matched ? (
+          <div className="flex items-start gap-3 px-3 py-2.5">
+            <Zap className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Eşleşen Kural</p>
+              <p className="text-xs font-semibold text-foreground mt-0.5 truncate">{matched.rule_name ?? '—'}</p>
+              {matched.action_taken && (
+                <p className={cn(
+                  'text-[11px] font-medium mt-0.5',
+                  matched.action_taken === 'Onaylandı' ? 'text-emerald-600' : 'text-red-500',
+                )}>
+                  → {matched.action_taken}
+                </p>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-0.5">{formatDateTime(matched.created_at)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-3 px-3 py-2.5">
+            <Zap className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Sonuç</p>
+              <p className="text-xs text-foreground mt-0.5">
+                {logs.length} kural değerlendirildi — hiçbiri eşleşmedi.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Skeleton rows ────────────────────────────────────────────────────────────
 
 function TableSkeletonRows() {
@@ -223,6 +285,8 @@ export default function ReturnsManagementPage() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const [token, setToken] = useState<string | null>(null);
+  const [automationLogs, setAutomationLogs] = useState<AutomationLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   const { settings, loadSettings } = useStoreSettings();
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -266,6 +330,19 @@ export default function ReturnsManagementPage() {
       setAdminNote(drawerRow.admin_note ?? '');
     }
   }, [drawerRow]);
+
+  // ── Fetch automation logs when drawer opens a new return ─────────────────
+
+  const drawerRowId = drawerRow?.id ?? null;
+  useEffect(() => {
+    if (!drawerRowId || !token) { setAutomationLogs([]); return; }
+    setLogsLoading(true);
+    fetch(`/api/returns/${drawerRowId}/logs`, { headers: { Authorization: `JWT ${token}` } })
+      .then((r) => r.json())
+      .then(({ data }) => setAutomationLogs(data ?? []))
+      .catch(() => setAutomationLogs([]))
+      .finally(() => setLogsLoading(false));
+  }, [drawerRowId, token]);
 
   // ── Header checkbox indeterminate state ───────────────────────────────────
 
@@ -764,6 +841,9 @@ export default function ReturnsManagementPage() {
 
                 {/* Request activity */}
                 <RequestActivity row={drawerRow} />
+
+                {/* Automation activity */}
+                <AutomationActivity logs={automationLogs} loading={logsLoading} />
 
                 {/* Admin note */}
                 <div>
