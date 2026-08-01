@@ -19,7 +19,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   FileX,
   Filter,
   MessageSquare,
@@ -28,12 +27,10 @@ import {
   RotateCcw,
   Search,
   SlidersHorizontal,
-  Truck,
   X,
   Zap,
   ZoomIn,
 } from 'lucide-react';
-import { CARRIER_LIST, SHIPPING_STATUS_LIST, getTrackingUrl } from '@/lib/shipping/carriers';
 import { cn } from '@/lib/utils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -66,11 +63,6 @@ type ReturnRow = {
   exchange_type: ExchangeType | null;
   exchange_variant: string | null;
   exchange_price_diff: number | null;
-  carrier: string | null;
-  tracking_number: string | null;
-  shipping_status: string | null;
-  shipping_date: string | null;
-  delivered_date: string | null;
 };
 
 type AutomationLog = {
@@ -317,11 +309,6 @@ export default function ReturnsManagementPage() {
   const [exchangePriceDiff, setExchangePriceDiff] = useState('');
   const [savingPriceDiff, setSavingPriceDiff] = useState(false);
 
-  // Shipping drawer state
-  const [shippingCarrier, setShippingCarrier] = useState('');
-  const [shippingTrackingNumber, setShippingTrackingNumber] = useState('');
-  const [shippingStatus, setShippingStatus] = useState('');
-  const [savingShipping, setSavingShipping] = useState(false);
 
   const [token, setToken] = useState<string | null>(null);
   const [automationLogs, setAutomationLogs] = useState<AutomationLog[]>([]);
@@ -368,9 +355,6 @@ export default function ReturnsManagementPage() {
       lastOpenedIdRef.current = drawerRow.id;
       setAdminNote(drawerRow.admin_note ?? '');
       setExchangePriceDiff(drawerRow.exchange_price_diff !== null ? String(drawerRow.exchange_price_diff) : '');
-      setShippingCarrier(drawerRow.carrier ?? '');
-      setShippingTrackingNumber(drawerRow.tracking_number ?? '');
-      setShippingStatus(drawerRow.shipping_status ?? '');
     }
   }, [drawerRow]);
 
@@ -469,8 +453,18 @@ export default function ReturnsManagementPage() {
     });
     setUpdatingStatus(false);
     if (!res.ok) { toast('Durum güncellenemedi', 'error'); return; }
+    if (status === 'Onaylandı') {
+      fetch('/api/email/return-approved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+        body: JSON.stringify({ return_id: id }),
+      }).catch(() => {});
+    }
     await fetchRows(token);
-    toast(status === 'Onaylandı' ? 'Talep onaylandı' : 'Talep reddedildi', 'success');
+    const label = status === 'Onaylandı' ? 'Talep onaylandı — müşteriye e-posta gönderildi'
+      : status === 'Reddedildi' ? 'Talep reddedildi'
+      : 'Durum güncellendi';
+    toast(label, 'success');
   };
 
   const saveNote = async () => {
@@ -500,31 +494,6 @@ export default function ReturnsManagementPage() {
     if (!res.ok) { toast('Fiyat farkı kaydedilemedi', 'error'); return; }
     await fetchRows(token);
     toast('Fiyat farkı kaydedildi', 'success');
-  };
-
-  const saveShipping = async () => {
-    if (!drawerRow || !token) return;
-    setSavingShipping(true);
-    const update: Record<string, unknown> = {
-      carrier: shippingCarrier || null,
-      tracking_number: shippingTrackingNumber.trim() || null,
-      shipping_status: shippingStatus || null,
-    };
-    if ((shippingCarrier || shippingTrackingNumber.trim()) && !drawerRow.shipping_date) {
-      update.shipping_date = new Date().toISOString();
-    }
-    if (shippingStatus === 'delivered' && !drawerRow.delivered_date) {
-      update.delivered_date = new Date().toISOString();
-    }
-    const res = await fetch(`/api/returns/${drawerRow.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
-      body: JSON.stringify(update),
-    });
-    setSavingShipping(false);
-    if (!res.ok) { toast('Kargo bilgileri kaydedilemedi', 'error'); return; }
-    await fetchRows(token);
-    toast('Kargo bilgileri kaydedildi', 'success');
   };
 
   const bulkUpdateStatus = async (status: string) => {
@@ -986,85 +955,6 @@ export default function ReturnsManagementPage() {
                     </div>
                   </div>
                 )}
-
-                {/* Shipping section */}
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Kargo Bilgileri</p>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground block mb-1">Kargo Firması</label>
-                      <select
-                        value={shippingCarrier}
-                        onChange={(e) => setShippingCarrier(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">— Seçin —</option>
-                        {CARRIER_LIST.map((c) => (
-                          <option key={c.id} value={c.id}>{c.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground block mb-1">Takip Numarası</label>
-                      <Input
-                        value={shippingTrackingNumber}
-                        onChange={(e) => setShippingTrackingNumber(e.target.value)}
-                        placeholder="Kargo takip numarası..."
-                        className="text-xs h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground block mb-1">Kargo Durumu</label>
-                      <select
-                        value={shippingStatus}
-                        onChange={(e) => setShippingStatus(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">— Seçin —</option>
-                        {SHIPPING_STATUS_LIST.map((s) => (
-                          <option key={s.value} value={s.value}>{s.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={saveShipping}
-                      disabled={savingShipping}
-                      className="w-full text-xs gap-2"
-                    >
-                      <Truck className="h-3.5 w-3.5" />
-                      {savingShipping ? 'Kaydediliyor...' : 'Kargo Kaydet'}
-                    </Button>
-                    {drawerRow.shipping_date && (
-                      <div className="rounded-lg bg-muted px-3 py-2 flex justify-between text-xs">
-                        <span className="text-muted-foreground">Gönderim Tarihi</span>
-                        <span className="font-medium">{formatDate(drawerRow.shipping_date)}</span>
-                      </div>
-                    )}
-                    {drawerRow.delivered_date && (
-                      <div className="rounded-lg bg-muted px-3 py-2 flex justify-between text-xs">
-                        <span className="text-muted-foreground">Teslim Tarihi</span>
-                        <span className="font-medium">{formatDate(drawerRow.delivered_date)}</span>
-                      </div>
-                    )}
-                    {drawerRow.carrier && drawerRow.tracking_number && (() => {
-                      const url = getTrackingUrl(drawerRow.carrier, drawerRow.tracking_number);
-                      if (!url) return null;
-                      return (
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/70 transition-colors"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          Kargo Takip Sayfasını Aç
-                        </a>
-                      );
-                    })()}
-                  </div>
-                </div>
 
                 {/* Description */}
                 {drawerRow.description && (

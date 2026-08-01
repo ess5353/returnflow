@@ -24,6 +24,9 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#000000');
   const [returnAddress, setReturnAddress] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [returnInstructions, setReturnInstructions] = useState('');
+  const [returnDeadlineDays, setReturnDeadlineDays] = useState('');
   const [returnPolicy, setReturnPolicy] = useState('');
 
   const loadSettings = useCallback(async (t: string) => {
@@ -39,6 +42,9 @@ export default function SettingsPage() {
         setLogoUrl(d.logo_url || '');
         setPrimaryColor(d.primary_color || '#000000');
         setReturnAddress(d.return_address || '');
+        setContactPhone(d.contact_phone || '');
+        setReturnInstructions(d.return_instructions || '');
+        setReturnDeadlineDays(d.return_deadline_days != null ? String(d.return_deadline_days) : '');
         setReturnPolicy(d.return_policy || '');
       }
     } catch (e) {
@@ -92,6 +98,9 @@ export default function SettingsPage() {
         logo_url: uploadedLogo,
         primary_color: primaryColor,
         return_address: returnAddress,
+        contact_phone: contactPhone,
+        return_instructions: returnInstructions,
+        return_deadline_days: returnDeadlineDays ? Number(returnDeadlineDays) : null,
         return_policy: returnPolicy,
       }),
     });
@@ -216,6 +225,51 @@ export default function SettingsPage() {
                     placeholder="Müşterilerin ürünleri gönderecekleri adres"
                     rows={3}
                   />
+                </div>
+                <div>
+                  <label htmlFor="contactPhone" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Müşteri İletişim Telefonu
+                  </label>
+                  <Input
+                    id="contactPhone"
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="+90 212 000 00 00"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Onay e-postasında gösterilecek iletişim numarası</p>
+                </div>
+                <div>
+                  <label htmlFor="returnInstructions" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    İade Adımları
+                  </label>
+                  <Textarea
+                    id="returnInstructions"
+                    value={returnInstructions}
+                    onChange={(e) => setReturnInstructions(e.target.value)}
+                    placeholder={`1. Ürünü orijinal ambalajında paketleyin\n2. Referans numaranızı paketin üzerine yazın\n3. Belirtilen adrese kargolayın`}
+                    rows={5}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Onay e-postasına eklenecek adım adım talimatlar</p>
+                </div>
+                <div>
+                  <label htmlFor="returnDeadlineDays" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    İade Süresi (Gün)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="returnDeadlineDays"
+                      type="number"
+                      min="1"
+                      max="90"
+                      value={returnDeadlineDays}
+                      onChange={(e) => setReturnDeadlineDays(e.target.value)}
+                      placeholder="14"
+                      className="w-28"
+                    />
+                    <span className="text-sm text-muted-foreground">gün içinde kargoya verilmeli</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Boş bırakılırsa son tarih gösterilmez</p>
                 </div>
                 <div>
                   <label htmlFor="returnPolicy" className="mb-1.5 block text-xs font-medium text-muted-foreground">
