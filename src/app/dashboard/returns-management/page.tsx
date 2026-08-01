@@ -26,7 +26,9 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Send,
   SlidersHorizontal,
+  Trash2,
   X,
   Zap,
   ZoomIn,
@@ -70,6 +72,13 @@ type AutomationLog = {
   rule_name: string | null;
   matched: boolean;
   action_taken: string | null;
+  created_at: string;
+};
+
+type ReturnNote = {
+  id: string;
+  author: string;
+  message: string;
   created_at: string;
 };
 
@@ -138,14 +147,40 @@ function sortRows(rows: ReturnRow[], key: SortKey): ReturnRow[] {
   });
 }
 
-// ─── Request Activity (real data only; no fabricated timeline) ───────────────
+// ─── Request Activity + Internal Notes ───────────────────────────────────────
 
-function RequestActivity({ row }: { row: ReturnRow }) {
+function RequestActivity({
+  row,
+  notes,
+  notesLoading,
+  noteInput,
+  submittingNote,
+  onNoteInputChange,
+  onAddNote,
+  onDeleteNote,
+}: {
+  row: ReturnRow;
+  notes: ReturnNote[];
+  notesLoading: boolean;
+  noteInput: string;
+  submittingNote: boolean;
+  onNoteInputChange: (v: string) => void;
+  onAddNote: () => void;
+  onDeleteNote: (id: string) => void;
+}) {
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Talep Aktivitesi</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aktivite & Dahili Notlar</p>
       <div className="rounded-xl border border-border bg-muted/40 divide-y divide-border overflow-hidden">
         <ActivityRow icon={<CalendarDays className="h-3.5 w-3.5" />} label="Oluşturulma" value={formatDateTime(row.created_at)} />
+        {notesLoading && (
+          <div className="px-3 py-3">
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        )}
+        {notes.map((note) => (
+          <NoteRow key={note.id} note={note} onDelete={onDeleteNote} />
+        ))}
         <ActivityRow
           icon={<Badge variant={statusVariant(row.status)} className="text-[10px]">{row.status}</Badge>}
           label="Güncel Durum"
@@ -159,7 +194,28 @@ function RequestActivity({ row }: { row: ReturnRow }) {
           <ActivityRow icon={<MessageSquare className="h-3.5 w-3.5" />} label="Mağaza Notu" value={row.admin_note} multiline />
         )}
       </div>
-      {/* When status_history table exists, render entries here sorted by created_at */}
+      <div className="flex gap-2">
+        <textarea
+          value={noteInput}
+          onChange={(e) => onNoteInputChange(e.target.value)}
+          placeholder="Dahili not ekle... (Ctrl+Enter)"
+          rows={2}
+          className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onAddNote(); }
+          }}
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onAddNote}
+          disabled={submittingNote || !noteInput.trim()}
+          className="h-auto px-3 self-stretch"
+          aria-label="Not ekle"
+        >
+          <Send className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -187,6 +243,34 @@ function ActivityRow({
             {value as string}
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+function NoteRow({ note, onDelete }: { note: ReturnNote; onDelete: (id: string) => void }) {
+  return (
+    <div className="flex items-start gap-3 px-3 py-2.5 group">
+      <MessageSquare className="h-3.5 w-3.5 mt-0.5 text-primary/70 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {note.author}
+          </p>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <p className="text-[10px] text-muted-foreground">{formatDateTime(note.created_at)}</p>
+            <button
+              onClick={() => onDelete(note.id)}
+              className="opacity-0 group-hover:opacity-100 flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-red-600 transition-all"
+              aria-label="Notu sil"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-foreground mt-0.5 leading-relaxed whitespace-pre-wrap break-words">
+          {note.message}
+        </p>
       </div>
     </div>
   );
@@ -313,6 +397,10 @@ export default function ReturnsManagementPage() {
   const [token, setToken] = useState<string | null>(null);
   const [automationLogs, setAutomationLogs] = useState<AutomationLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [notes, setNotes] = useState<ReturnNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [noteInput, setNoteInput] = useState('');
+  const [submittingNote, setSubmittingNote] = useState(false);
   const { settings, loadSettings } = useStoreSettings();
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -355,6 +443,7 @@ export default function ReturnsManagementPage() {
       lastOpenedIdRef.current = drawerRow.id;
       setAdminNote(drawerRow.admin_note ?? '');
       setExchangePriceDiff(drawerRow.exchange_price_diff !== null ? String(drawerRow.exchange_price_diff) : '');
+      setNoteInput('');
     }
   }, [drawerRow]);
 
@@ -362,13 +451,23 @@ export default function ReturnsManagementPage() {
 
   const drawerRowId = drawerRow?.id ?? null;
   useEffect(() => {
-    if (!drawerRowId || !token) { setAutomationLogs([]); return; }
+    if (!drawerRowId || !token) {
+      setAutomationLogs([]);
+      setNotes([]);
+      return;
+    }
     setLogsLoading(true);
+    setNotesLoading(true);
     fetch(`/api/returns/${drawerRowId}/logs`, { headers: { Authorization: `JWT ${token}` } })
       .then((r) => r.json())
       .then(({ data }) => setAutomationLogs(data ?? []))
       .catch(() => setAutomationLogs([]))
       .finally(() => setLogsLoading(false));
+    fetch(`/api/returns/${drawerRowId}/notes`, { headers: { Authorization: `JWT ${token}` } })
+      .then((r) => r.json())
+      .then(({ data }) => setNotes(data ?? []))
+      .catch(() => setNotes([]))
+      .finally(() => setNotesLoading(false));
   }, [drawerRowId, token]);
 
   // ── Header checkbox indeterminate state ───────────────────────────────────
@@ -504,6 +603,37 @@ export default function ReturnsManagementPage() {
     if (!res.ok) { toast('Fiyat farkı kaydedilemedi', 'error'); return; }
     await fetchRows(token);
     toast('Fiyat farkı kaydedildi', 'success');
+  };
+
+  const addNote = async () => {
+    if (!noteInput.trim() || !token || !drawerRow) return;
+    setSubmittingNote(true);
+    const res = await fetch(`/api/returns/${drawerRow.id}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ author: 'Yönetici', message: noteInput.trim() }),
+    });
+    if (res.ok) {
+      const { data } = await res.json();
+      setNotes((prev) => [...prev, data as ReturnNote]);
+      setNoteInput('');
+    } else {
+      toast('Not eklenemedi', 'error');
+    }
+    setSubmittingNote(false);
+  };
+
+  const deleteNote = async (noteId: string) => {
+    if (!token || !drawerRow) return;
+    const res = await fetch(`/api/returns/${drawerRow.id}/notes/${noteId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `JWT ${token}` },
+    });
+    if (res.ok) {
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    } else {
+      toast('Not silinemedi', 'error');
+    }
   };
 
   const bulkUpdateStatus = async (status: string) => {
@@ -1002,8 +1132,17 @@ export default function ReturnsManagementPage() {
                   </div>
                 )}
 
-                {/* Request activity */}
-                <RequestActivity row={drawerRow} />
+                {/* Request activity + internal notes */}
+                <RequestActivity
+                  row={drawerRow}
+                  notes={notes}
+                  notesLoading={notesLoading}
+                  noteInput={noteInput}
+                  submittingNote={submittingNote}
+                  onNoteInputChange={setNoteInput}
+                  onAddNote={addNote}
+                  onDeleteNote={deleteNote}
+                />
 
                 {/* Automation activity */}
                 <AutomationActivity logs={automationLogs} loading={logsLoading} />

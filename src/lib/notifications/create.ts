@@ -8,7 +8,8 @@ export type NotificationType =
   | 'exchange_approved'
   | 'exchange_completed'
   | 'automation_triggered'
-  | 'refund_completed';
+  | 'refund_completed'
+  | 'note_added';
 
 interface CreateNotificationParams {
   merchantId: string;

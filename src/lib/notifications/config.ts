@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   Check,
   CheckCircle,
+  MessageSquare,
   PackageCheck,
   RotateCcw,
   X,
@@ -66,6 +67,12 @@ export const NOTIFICATION_CONFIG: Record<NotificationType, NotificationConfig> =
     bgClass: 'bg-emerald-100',
     iconClass: 'text-emerald-600',
   },
+  note_added: {
+    label: 'Dahili Not',
+    icon: MessageSquare,
+    bgClass: 'bg-slate-100',
+    iconClass: 'text-slate-600',
+  },
 };
 
 export const NOTIFICATION_TYPE_OPTIONS: { value: string; label: string }[] = [
@@ -78,6 +85,7 @@ export const NOTIFICATION_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: 'exchange_completed', label: 'Değişim Tamamlandı' },
   { value: 'automation_triggered', label: 'Otomasyon' },
   { value: 'refund_completed', label: 'İade Tamamlandı' },
+  { value: 'note_added', label: 'Dahili Not' },
 ];
 
 export function timeAgo(iso: string): string {
