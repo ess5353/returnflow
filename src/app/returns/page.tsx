@@ -112,7 +112,7 @@ export default function ReturnsPage() {
 
     if (!res.ok || !result.data) {
       setIsSubmitting(false);
-      if (res.status === 403 && (result.code === 'PLAN_EXPIRED' || result.code === 'PLAN_LIMIT_REACHED')) {
+      if (res.status === 403 && result.code === 'PLAN_EXPIRED') {
         toast('Bu mağaza şu anda iade kabulü yapmıyor. Lütfen mağazayla iletişime geçin.', 'error');
       } else {
         toast(res.status === 409 ? 'Bu sipariş için zaten bir talep oluşturulmuş.' : 'Kayıt sırasında hata oluştu', 'error');

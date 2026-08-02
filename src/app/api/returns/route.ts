@@ -9,7 +9,7 @@ import { createNotification } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import { createAuditLog } from '@/lib/audit/log';
 import { rateLimit, getClientIp, LIMITS } from '@/lib/security/rate-limit';
-import { incrementUsage } from '@/lib/billing/usage';
+import { getBillingEntitlement } from '@/lib/billing/entitlement';
 
 const returnSchema = z.object({
   order_id:        z.string().min(1).max(100),
@@ -99,16 +99,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Merchant not found' }, { status: 500 });
   }
 
-  // Billing enforcement — check entitlement and atomically increment usage
-  const billing = await incrementUsage(
-    merchant_id,
-    rType === 'exchange' ? 'exchange_submission' : 'return_submission',
-  );
-  if (!billing.allowed) {
+  // Billing gate — block if trial expired or subscription cancelled
+  const entitlement = await getBillingEntitlement(merchant_id);
+  if (entitlement.isExpired) {
     return NextResponse.json(
-      billing.reason === 'PLAN_LIMIT_REACHED'
-        ? { error: 'Plan limit reached', code: 'PLAN_LIMIT_REACHED', upgrade_required: true }
-        : { error: 'Subscription expired', code: 'PLAN_EXPIRED', upgrade_required: true },
+      { error: 'Subscription expired', code: 'PLAN_EXPIRED', upgrade_required: true },
       { status: 403 },
     );
   }

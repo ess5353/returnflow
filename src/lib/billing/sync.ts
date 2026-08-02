@@ -4,14 +4,6 @@ import { getIkas } from '@/helpers/api-helpers';
 
 const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
-/** Returns 'pro' if the key matches our configured subscription key, null otherwise. */
-function determinePlan(subKey: string | null | undefined): 'pro' | null {
-  if (!subKey) return null;
-  const proKey = process.env.IKAS_PRO_SUBSCRIPTION_KEY;
-  if (proKey && subKey === proKey) return 'pro';
-  return 'pro'; // treat any unrecognised paid key as pro
-}
-
 /** Non-blocking lazy sync — fire-and-forget when billing data is stale. */
 export function maybeSyncLazy(merchantId: string, authorizedAppId: string): void {
   void Promise.resolve(
@@ -49,23 +41,20 @@ export async function syncMerchantBilling(merchantId: string, authorizedAppId: s
 
     const { data: billing } = await supabaseAdmin
       .from('merchant_billing')
-      .select('plan, status, current_period_start, ikas_subscription_key')
+      .select('plan, status, current_period_start')
       .eq('merchant_id', merchantId)
       .maybeSingle();
 
     if (!billing) return;
 
+    const now = new Date().toISOString();
+
     if (!currentSub) {
-      // Subscription removed — expire if on a paid plan
+      // Subscription removed — expire any paid plan
       if (billing.plan !== 'trial' && billing.plan !== 'enterprise' && billing.status !== 'expired') {
         await supabaseAdmin
           .from('merchant_billing')
-          .update({
-            status: 'expired',
-            ikas_status: 'REMOVED',
-            ikas_last_synced_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          .update({ status: 'expired', ikas_status: 'REMOVED', ikas_last_synced_at: now, updated_at: now })
           .eq('merchant_id', merchantId);
 
         await supabaseAdmin.from('billing_events').insert({
@@ -76,18 +65,11 @@ export async function syncMerchantBilling(merchantId: string, authorizedAppId: s
       } else {
         await supabaseAdmin
           .from('merchant_billing')
-          .update({
-            ikas_status: 'REMOVED',
-            ikas_last_synced_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          .update({ ikas_status: 'REMOVED', ikas_last_synced_at: now, updated_at: now })
           .eq('merchant_id', merchantId);
       }
       return;
     }
-
-    const detectedPlan = determinePlan(currentSub.storeAppListingSubscriptionKey);
-    const planChanged = detectedPlan && billing.plan !== detectedPlan && billing.plan !== 'enterprise';
 
     const lastPaymentDate = currentSub.lastPaymentDate
       ? new Date(currentSub.lastPaymentDate as unknown as string)
@@ -95,40 +77,43 @@ export async function syncMerchantBilling(merchantId: string, authorizedAppId: s
     const storedPeriodStart = billing.current_period_start
       ? new Date(billing.current_period_start)
       : null;
-    const isRenewal =
-      lastPaymentDate && storedPeriodStart && lastPaymentDate > storedPeriodStart;
 
-    const periodDays = currentSub.lastPaymentPeriodInDays ?? 30;
+    const periodDays = currentSub.lastPaymentPeriodInDays ?? 365;
     const periodEnd = lastPaymentDate
       ? new Date(lastPaymentDate.getTime() + periodDays * 86400 * 1000).toISOString()
       : null;
     const periodStart = lastPaymentDate?.toISOString() ?? null;
 
+    const isNewSubscription = billing.plan !== 'pro' && billing.plan !== 'enterprise';
+    const isRenewal =
+      !isNewSubscription &&
+      lastPaymentDate &&
+      storedPeriodStart &&
+      lastPaymentDate > storedPeriodStart;
+
     const updates: Record<string, unknown> = {
       ikas_status: currentSub.status,
       ikas_subscription_key: currentSub.storeAppListingSubscriptionKey,
-      ikas_last_synced_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      ikas_last_synced_at: now,
+      updated_at: now,
     };
 
-    if (planChanged) {
-      updates.plan = detectedPlan;
+    if (isNewSubscription) {
+      // Trial → Pro upgrade
+      updates.plan = 'pro';
       updates.status = 'active';
-      updates.requests_limit = 1000;
       updates.current_period_start = periodStart;
       updates.current_period_end = periodEnd;
-      updates.requests_used_this_period = 0;
 
       await supabaseAdmin.from('billing_events').insert({
         merchant_id: merchantId,
         event: 'upgraded',
-        data: { plan: detectedPlan, subscription_key: currentSub.storeAppListingSubscriptionKey },
+        data: { plan: 'pro', subscription_key: currentSub.storeAppListingSubscriptionKey },
       });
     } else if (isRenewal) {
       updates.status = 'active';
       updates.current_period_start = periodStart;
       updates.current_period_end = periodEnd;
-      updates.requests_used_this_period = 0;
 
       await supabaseAdmin.from('billing_events').insert({
         merchant_id: merchantId,
@@ -138,10 +123,10 @@ export async function syncMerchantBilling(merchantId: string, authorizedAppId: s
     } else if (currentSub.status === 'WILL_BE_REMOVED') {
       updates.status = 'will_expire';
     } else if (billing.status === 'expired' && currentSub.status === 'ACTIVE') {
+      // Re-subscribed after expiry
       updates.status = 'active';
       updates.current_period_start = periodStart;
       updates.current_period_end = periodEnd;
-      updates.requests_used_this_period = 0;
     }
 
     await supabaseAdmin.from('merchant_billing').update(updates).eq('merchant_id', merchantId);
@@ -150,7 +135,7 @@ export async function syncMerchantBilling(merchantId: string, authorizedAppId: s
   }
 }
 
-/** Create an initial 14-day trial billing record for a new merchant install. */
+/** Create a 14-day trial billing record for a new merchant install. */
 export async function createTrialBillingRecord(merchantId: string): Promise<void> {
   const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -162,8 +147,6 @@ export async function createTrialBillingRecord(merchantId: string): Promise<void
         plan: 'trial',
         status: 'active',
         trial_ends_at: trialEndsAt,
-        requests_limit: -1,
-        requests_used_this_period: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
