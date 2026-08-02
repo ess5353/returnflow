@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getAuthContext } from '@/lib/auth/context';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
@@ -7,6 +8,26 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import { createAuditLog } from '@/lib/audit/log';
+import { rateLimit, getClientIp, LIMITS } from '@/lib/security/rate-limit';
+
+const returnSchema = z.object({
+  order_id:        z.string().min(1).max(100),
+  customer_name:   z.string().min(1).max(200),
+  customer_email:  z.string().email().max(254).optional(),
+  product:         z.string().max(500).optional(),
+  products:        z.array(z.object({
+    name:     z.string().max(200),
+    quantity: z.number().int().min(1).max(999),
+    price:    z.number().min(0),
+  })).max(50).optional(),
+  reason:          z.string().min(1).max(500),
+  description:     z.string().max(2000).optional(),
+  amount:          z.union([z.string().max(50), z.number()]),
+  media_urls:      z.array(z.string().url().max(2048)).max(10).optional(),
+  request_type:    z.enum(['return', 'exchange']).optional(),
+  exchange_type:   z.enum(['same_product_size', 'same_product_color', 'different_product']).optional(),
+  exchange_variant: z.string().max(500).optional(),
+});
 
 // ── GET: list all returns for the authenticated merchant ───────────────────
 export async function GET(request: NextRequest) {
@@ -30,37 +51,32 @@ export async function GET(request: NextRequest) {
 
 // ── POST: create a new return (public — called from customer portal) ────────
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>;
+  // Rate limit: 5 submissions per IP per minute
+  const ip = getClientIp(request);
+  const rl = rateLimit(`returns.submit:${ip}`, LIMITS.returns.max, LIMITS.returns.windowMs);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests, please try again shortly' }, { status: 429 });
+  }
+
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const parsed = returnSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Invalid input' }, { status: 400 });
   }
 
   const {
     order_id, customer_name, customer_email, product, products,
     reason, description, amount, media_urls,
     request_type, exchange_type, exchange_variant,
-  } = body as {
-    order_id: string;
-    customer_name: string;
-    customer_email?: string;
-    product?: string;
-    products?: { name: string; quantity: number; price: number }[];
-    reason: string;
-    description?: string;
-    amount: string | number;
-    media_urls?: string[];
-    request_type?: 'return' | 'exchange';
-    exchange_type?: 'same_product_size' | 'same_product_color' | 'different_product';
-    exchange_variant?: string;
-  };
+  } = parsed.data;
 
   const rType = request_type ?? 'return';
-
-  if (!order_id || !reason) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-  }
 
   // Derive merchant_id server-side from the stored auth token — never trust the client.
   const tokens = await AuthTokenManager.list();

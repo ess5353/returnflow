@@ -4,12 +4,19 @@ import { Resend } from 'resend';
 import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { renderTemplate, DEFAULT_TEMPLATES, TEMPLATE_META, SAMPLE_VARS, type TemplateType } from '@/lib/email/templates';
+import { rateLimit, LIMITS } from '@/lib/security/rate-limit';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Rate limit: 5 test emails per merchant per hour
+  const rl = rateLimit(`email.test:${user.merchantId}`, LIMITS.email.max, LIMITS.email.windowMs);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many test emails, please try again later' }, { status: 429 });
+  }
 
   let body: { template_type?: string };
   try {

@@ -1,10 +1,18 @@
 export const dynamic = 'force-dynamic';
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { ROLES, type Role } from '@/lib/auth/permissions';
 import { createAuditLog, getIp } from '@/lib/audit/log';
+import { rateLimit, LIMITS } from '@/lib/security/rate-limit';
+
+const inviteSchema = z.object({
+  email: z.string().email().max(254),
+  name: z.string().min(1).max(100).optional(),
+  role: z.enum(ROLES),
+});
 
 export async function GET(request: NextRequest) {
   const ctx = getAuthContext(request);
@@ -30,18 +38,25 @@ export async function POST(request: NextRequest) {
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!ctx.can('team.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  let body: { email?: string; name?: string; role?: string };
+  // Rate limit: 10 invites per merchant per hour
+  const rl = rateLimit(`team.invite:${ctx.merchantId}`, LIMITS.invite.max, LIMITS.invite.windowMs);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many invitations sent, please try again later' }, { status: 429 });
+  }
+
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { email, name, role } = body;
-  if (!email?.trim()) return NextResponse.json({ error: 'Email is required' }, { status: 400 });
-  if (!role || !ROLES.includes(role as Role)) {
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+  const parsed = inviteSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Invalid input' }, { status: 400 });
   }
+
+  const { email, name, role } = parsed.data;
   if (role === 'owner') return NextResponse.json({ error: 'Cannot invite as owner' }, { status: 400 });
 
   // Upsert team member

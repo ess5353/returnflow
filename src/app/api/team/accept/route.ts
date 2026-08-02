@@ -1,18 +1,37 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createStaffToken } from '@/lib/auth/staff-jwt';
 import { getEffectivePermissions, type Role } from '@/lib/auth/permissions';
+import { rateLimit, getClientIp, LIMITS } from '@/lib/security/rate-limit';
+
+const acceptSchema = z.object({
+  token: z.string().min(1).max(200),
+  name: z.string().min(1).max(100).optional(),
+});
 
 export async function POST(request: NextRequest) {
-  let body: { token?: string; name?: string };
+  // Rate limit: 10 attempts per IP per 15 min (brute-force protection)
+  const ip = getClientIp(request);
+  const rl = rateLimit(`team.accept:${ip}`, LIMITS.auth.max, LIMITS.auth.windowMs);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many attempts, please try again later' }, { status: 429 });
+  }
+
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { token, name } = body;
+  const parsed = acceptSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Invalid input' }, { status: 400 });
+  }
+
+  const { token, name } = parsed.data;
   if (!token) return NextResponse.json({ error: 'Token is required' }, { status: 400 });
 
   // Look up invitation
