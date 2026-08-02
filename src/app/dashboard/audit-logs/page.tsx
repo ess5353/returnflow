@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type AuditAction =
   | 'return.created' | 'return.approved' | 'return.rejected' | 'return.completed'
@@ -269,7 +270,16 @@ export default function AuditLogsPage() {
       {/* Table */}
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Yükleniyor...</div>
+          <div className="divide-y divide-border">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3">
+                <Skeleton className="h-3 w-28 shrink-0" />
+                <Skeleton className="h-3 w-36" />
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-16 ml-auto" />
+              </div>
+            ))}
+          </div>
         ) : logs.length === 0 ? (
           <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Kayıt bulunamadı.</div>
         ) : (

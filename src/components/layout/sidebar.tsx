@@ -4,9 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { ArrowLeftRight, BarChart2, Bell, BookOpen, Brain, ChevronLeft, ChevronRight, ClipboardList, CreditCard, Globe, Key, LayoutDashboard, LayoutList, Mail, Settings, ShieldCheck, Users, Zap } from 'lucide-react';
+import { ArrowLeftRight, BarChart2, Bell, BookOpen, Brain, ChevronLeft, ChevronRight, ClipboardList, CreditCard, Globe, HelpCircle, Info, Key, LayoutDashboard, LayoutList, Mail, ScrollText, Settings, ShieldCheck, Users, Zap } from 'lucide-react';
 
-const NAV = [
+type NavItem = { href: string; label: string; icon: React.ElementType; exact: boolean };
+
+const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Genel Bakış', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/returns-management', label: 'İade Yönetimi', icon: LayoutList, exact: false },
   { href: '/dashboard/analytics', label: 'Analiz', icon: BarChart2, exact: false },
@@ -22,6 +24,12 @@ const NAV = [
   { href: '/dashboard/billing', label: 'Fatura & Plan', icon: CreditCard, exact: false },
   { href: '/dashboard/security', label: 'Güvenlik', icon: ShieldCheck, exact: false },
   { href: '/dashboard/settings', label: 'Ayarlar', icon: Settings, exact: false },
+];
+
+const NAV_BOTTOM: NavItem[] = [
+  { href: '/dashboard/help', label: 'Yardım', icon: HelpCircle, exact: false },
+  { href: '/dashboard/changelog', label: 'Değişiklikler', icon: ScrollText, exact: false },
+  { href: '/dashboard/about', label: 'Hakkında', icon: Info, exact: false },
 ];
 
 interface SidebarProps {
@@ -55,7 +63,7 @@ export function Sidebar({ storeName, logoUrl }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className={cn('flex-1 space-y-0.5 py-3', collapsed ? 'px-2' : 'px-3')}>
+      <nav className={cn('flex-1 overflow-y-auto space-y-0.5 py-3', collapsed ? 'px-2' : 'px-3')}>
         {NAV.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
@@ -74,6 +82,27 @@ export function Sidebar({ storeName, logoUrl }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* Bottom nav — help / changelog / about */}
+      <div className={cn('border-t border-border py-2 space-y-0.5', collapsed ? 'px-2' : 'px-3')}>
+        {NAV_BOTTOM.map(({ href, label, icon: Icon, exact }) => {
+          const active = exact ? pathname === href : pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              title={collapsed ? label : undefined}
+              className={cn(
+                'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
+                active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {!collapsed && <span className="truncate">{label}</span>}
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Collapse toggle */}
       <button

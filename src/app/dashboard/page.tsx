@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
-import { Check, ChevronRight, Copy, RefreshCw, Trash2, X } from 'lucide-react';
+import { Check, ChevronRight, Copy, FlaskConical, RefreshCw, Trash2, X } from 'lucide-react';
+import { OnboardingWizard } from '@/components/onboarding/wizard';
+import { OnboardingChecklist } from '@/components/onboarding/checklist';
 
 type ReturnRequest = {
   id: string;
@@ -64,6 +66,7 @@ export default function DashboardPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [seedingDemo, setSeedingDemo] = useState(false);
   const { settings, loadSettings: fetchSettings } = useStoreSettings();
 
   const fetchRequests = useCallback(async (t: string) => {
@@ -126,6 +129,25 @@ export default function DashboardPage() {
     toast('Not kaydedildi', 'success');
   }, [selectedRequest, token, adminNote, fetchRequests]);
 
+  const seedDemoData = useCallback(async () => {
+    if (!token) return;
+    setSeedingDemo(true);
+    try {
+      const res = await fetch('/api/demo-data', { method: 'POST', headers: { Authorization: token } });
+      if (res.ok) {
+        await fetchRequests(token);
+        toast('Demo veriler yüklendi', 'success');
+      } else {
+        const j = await res.json();
+        toast((j.error as string | undefined) ?? 'Demo veriler yüklenemedi', 'error');
+      }
+    } catch {
+      toast('Bağlantı hatası', 'error');
+    } finally {
+      setSeedingDemo(false);
+    }
+  }, [token, fetchRequests]);
+
   const handleDelete = useCallback(async () => {
     if (!selectedRequest || !token) return;
     const res = await fetch(`/api/returns/${selectedRequest.id}`, {
@@ -176,6 +198,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
+      <OnboardingWizard />
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -219,6 +242,9 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* Onboarding checklist — shown until all steps done */}
+        {!loading && <OnboardingChecklist />}
 
         {/* Portal link */}
         <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
@@ -303,8 +329,22 @@ export default function DashboardPage() {
                     </div>
                   ))
                 ) : filteredRequests.length === 0 ? (
-                  <div className="py-12 text-center text-sm text-muted-foreground">
-                    {requests.length === 0 ? 'Henüz iade talebi yok.' : 'Filtreyle eşleşen talep bulunamadı.'}
+                  <div className="py-12 text-center space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {requests.length === 0 ? 'Henüz iade talebi yok.' : 'Filtreyle eşleşen talep bulunamadı.'}
+                    </p>
+                    {requests.length === 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={seedDemoData}
+                        disabled={seedingDemo}
+                      >
+                        <FlaskConical className="h-3.5 w-3.5" />
+                        {seedingDemo ? 'Yükleniyor...' : 'Demo Veri Yükle'}
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   filteredRequests.map((req) => {
