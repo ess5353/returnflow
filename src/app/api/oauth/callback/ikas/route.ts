@@ -1,5 +1,6 @@
 import { config } from '@/globals/config';
 import { getSession, setSession } from '@/lib/session';
+import { createTrialBillingRecord } from '@/lib/billing/sync';
 import { validateRequest } from '@/lib/validation';
 import { OAuthAPI } from '@ikas/admin-api-client';
 import moment from 'moment';
@@ -125,6 +126,13 @@ export async function GET(request: NextRequest) {
       await AuthTokenManager.put(token);
     } catch (e) {
       console.error('OAuth callback: failed to save token:', e);
+    }
+
+    // Create a trial billing record for new installs (idempotent — ignored if exists)
+    try {
+      await createTrialBillingRecord(merchantId);
+    } catch (e) {
+      console.error('OAuth callback: failed to create billing record:', e);
     }
 
 

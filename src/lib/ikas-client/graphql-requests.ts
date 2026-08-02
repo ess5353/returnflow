@@ -19,6 +19,48 @@ export const GET_AUTHORIZED_APP = gql`
   }
 `;
 
+export const GET_MERCHANT_LICENCE = gql`
+  query getMerchantLicence {
+    getMerchantLicence {
+      merchantId
+      appSubscriptions {
+        id
+        name
+        status
+        storeAppListingSubscriptionKey
+        lastPaymentDate
+        lastPaymentPeriodInDays
+        lastPaymentPrice
+        addedDate
+      }
+    }
+  }
+`;
+
+export const CREATE_MERCHANT_APP_PAYMENT = gql`
+  mutation createMerchantAppPayment($input: CreateMerchantAppPaymentWithSubscriptionInput!) {
+    createMerchantAppPayment(input: $input) {
+      id
+      merchantPaymentUrl
+      status
+    }
+  }
+`;
+
+export const LIST_MERCHANT_APP_PAYMENT = gql`
+  query listMerchantAppPayment {
+    listMerchantAppPayment {
+      count
+      data {
+        id
+        status
+        paymentDate
+        storeAppListingSubscriptionKey
+      }
+    }
+  }
+`;
+
 export const TEST_ORDERS = gql`
 query listOrder {
   listOrder {

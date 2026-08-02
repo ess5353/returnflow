@@ -9,6 +9,7 @@ import { createNotification } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import { createAuditLog } from '@/lib/audit/log';
 import { rateLimit, getClientIp, LIMITS } from '@/lib/security/rate-limit';
+import { incrementUsage } from '@/lib/billing/usage';
 
 const returnSchema = z.object({
   order_id:        z.string().min(1).max(100),
@@ -96,6 +97,20 @@ export async function POST(request: NextRequest) {
   if (!merchant_id) {
     console.error('returns POST: merchant_id could not be resolved');
     return NextResponse.json({ error: 'Merchant not found' }, { status: 500 });
+  }
+
+  // Billing enforcement — check entitlement and atomically increment usage
+  const billing = await incrementUsage(
+    merchant_id,
+    rType === 'exchange' ? 'exchange_submission' : 'return_submission',
+  );
+  if (!billing.allowed) {
+    return NextResponse.json(
+      billing.reason === 'PLAN_LIMIT_REACHED'
+        ? { error: 'Plan limit reached', code: 'PLAN_LIMIT_REACHED', upgrade_required: true }
+        : { error: 'Subscription expired', code: 'PLAN_EXPIRED', upgrade_required: true },
+      { status: 403 },
+    );
   }
 
   // One return OR one exchange per order per merchant (not two of the same type)
