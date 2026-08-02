@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
@@ -668,7 +668,7 @@ function RuleEditor({
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AutomationPage() {
-  const [token, setToken] = useState<string | null>(null);
+  const { authHeader: token, can } = useAuth();
   const [rules, setRules] = useState<AutomationRule[]>([]);
   const [stats, setStats] = useState<RuleStats>({});
   const [loading, setLoading] = useState(true);
@@ -679,7 +679,7 @@ export default function AutomationPage() {
   const { settings, loadSettings } = useStoreSettings();
 
   const fetchRules = useCallback(async (t: string) => {
-    const res = await fetch('/api/automation/rules', { headers: { Authorization: `JWT ${t}` } });
+    const res = await fetch('/api/automation/rules', { headers: { Authorization: t } });
     if (!res.ok) { toast('Kurallar yüklenemedi', 'error'); setLoading(false); return; }
     const { data } = await res.json();
     setRules(data ?? []);
@@ -687,7 +687,7 @@ export default function AutomationPage() {
   }, []);
 
   const fetchStats = useCallback(async (t: string) => {
-    const res = await fetch('/api/automation/stats', { headers: { Authorization: `JWT ${t}` } });
+    const res = await fetch('/api/automation/stats', { headers: { Authorization: t } });
     if (!res.ok) return;
     const { data } = await res.json();
     setStats(data ?? {});
@@ -698,19 +698,14 @@ export default function AutomationPage() {
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      const t = await TokenHelpers.getTokenForIframeApp();
-      setToken(t);
-      if (t) {
-        await Promise.all([fetchRules(t), fetchStats(t)]);
-      } else {
-        setLoading(false);
-      }
-      await loadSettings();
-    };
-    init();
+    if (token) {
+      Promise.all([fetchRules(token), fetchStats(token)]).catch(() => null);
+      loadSettings().catch(() => null);
+    } else {
+      setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   const openNew = () => {
     setEditingRule(null);
@@ -731,7 +726,7 @@ export default function AutomationPage() {
     if (editingRule) {
       const res = await fetch(`/api/automation/rules/${editingRule.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
         body: JSON.stringify(draft),
       });
       setSaving(false);
@@ -740,7 +735,7 @@ export default function AutomationPage() {
     } else {
       const res = await fetch('/api/automation/rules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
         body: JSON.stringify(draft),
       });
       setSaving(false);
@@ -760,7 +755,7 @@ export default function AutomationPage() {
     setConfirmDeleteId(null);
     const res = await fetch(`/api/automation/rules/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `JWT ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     if (!res.ok) { toast('Kural silinemedi', 'error'); return; }
     toast('Kural silindi', 'success');
@@ -771,7 +766,7 @@ export default function AutomationPage() {
     if (!token) return;
     const res = await fetch(`/api/automation/rules/${rule.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ enabled: !rule.enabled }),
     });
     if (!res.ok) { toast('Durum güncellenemedi', 'error'); return; }
@@ -793,7 +788,7 @@ export default function AutomationPage() {
       reordered.map((r, i) =>
         fetch(`/api/automation/rules/${r.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+          headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
           body: JSON.stringify({ priority: i }),
         })
       )
@@ -815,7 +810,7 @@ export default function AutomationPage() {
     };
     const res = await fetch('/api/automation/rules', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify(draft),
     });
     if (!res.ok) { toast('Kural kopyalanamadı', 'error'); return; }

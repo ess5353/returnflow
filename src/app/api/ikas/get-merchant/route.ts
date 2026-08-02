@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { GetMerchantQueryData } from '@/lib/ikas-client/generated/graphql';
 import { getIkas } from '@/helpers/api-helpers';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -11,7 +11,7 @@ export type GetMerchantApiResponse = {
 
 export async function GET(request: NextRequest) {
   try {
-    const user = getUserFromRequest(request);
+    const user = getAuthContext(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

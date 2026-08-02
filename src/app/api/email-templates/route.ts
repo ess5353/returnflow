@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { DEFAULT_TEMPLATES, TEMPLATE_META, type TemplateType } from '@/lib/email/templates';
 
@@ -10,7 +10,7 @@ const ALL_TYPES: TemplateType[] = [
 ];
 
 export async function GET(request: NextRequest) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data, error } = await supabaseAdmin

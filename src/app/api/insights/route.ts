@@ -1,14 +1,15 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { computeMerchantStats } from '@/lib/insights/compute';
 import { generateDeterministicInsights, generateAIInsights } from '@/lib/insights/generate';
 import { getCachedInsights, setCachedInsights } from '@/lib/insights/cache';
 import type { InsightsPayload } from '@/lib/insights/types';
 
 export async function GET(request: NextRequest) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('analytics.view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   // Check cache first (unless force refresh requested)
   const forceRefresh = request.nextUrl.searchParams.get('refresh') === '1';

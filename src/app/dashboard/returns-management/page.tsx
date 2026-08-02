@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
@@ -457,7 +457,7 @@ export default function ReturnsManagementPage() {
   const [exportOpen, setExportOpen] = useState(false);
 
 
-  const [token, setToken] = useState<string | null>(null);
+  const { authHeader: token, can } = useAuth();
   const [automationLogs, setAutomationLogs] = useState<AutomationLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [notes, setNotes] = useState<ReturnNote[]>([]);
@@ -472,7 +472,7 @@ export default function ReturnsManagementPage() {
 
   const fetchRows = useCallback(async (t: string) => {
     setError(null);
-    const res = await fetch('/api/returns', { headers: { Authorization: `JWT ${t}` } });
+    const res = await fetch('/api/returns', { headers: { Authorization: t } });
     if (!res.ok) {
       setError('İade talepleri alınamadı. Lütfen tekrar deneyin.');
       setLoading(false);
@@ -490,15 +490,12 @@ export default function ReturnsManagementPage() {
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      const t = await TokenHelpers.getTokenForIframeApp();
-      setToken(t);
-      if (t) await fetchRows(t);
-      await loadSettings();
-    };
-    init();
+    if (token) {
+      fetchRows(token).catch(() => null);
+      loadSettings().catch(() => null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   // ── Sync admin note + exchange price diff when drawer opens ──────────────
 
@@ -525,17 +522,17 @@ export default function ReturnsManagementPage() {
     setLogsLoading(true);
     setNotesLoading(true);
     setAuditLoading(true);
-    fetch(`/api/returns/${drawerRowId}/logs`, { headers: { Authorization: `JWT ${token}` } })
+    fetch(`/api/returns/${drawerRowId}/logs`, { headers: { Authorization: token ?? '' } })
       .then((r) => r.json())
       .then(({ data }) => setAutomationLogs(data ?? []))
       .catch(() => setAutomationLogs([]))
       .finally(() => setLogsLoading(false));
-    fetch(`/api/returns/${drawerRowId}/notes`, { headers: { Authorization: `JWT ${token}` } })
+    fetch(`/api/returns/${drawerRowId}/notes`, { headers: { Authorization: token ?? '' } })
       .then((r) => r.json())
       .then(({ data }) => setNotes(data ?? []))
       .catch(() => setNotes([]))
       .finally(() => setNotesLoading(false));
-    fetch(`/api/returns/${drawerRowId}/audit`, { headers: { Authorization: `JWT ${token}` } })
+    fetch(`/api/returns/${drawerRowId}/audit`, { headers: { Authorization: token ?? '' } })
       .then((r) => r.json())
       .then(({ data }) => setAuditLogs(data ?? []))
       .catch(() => setAuditLogs([]))
@@ -619,7 +616,7 @@ export default function ReturnsManagementPage() {
     setUpdatingStatus(true);
     const res = await fetch(`/api/returns/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ status }),
     });
     setUpdatingStatus(false);
@@ -635,7 +632,7 @@ export default function ReturnsManagementPage() {
     if (templateType) {
       fetch('/api/email/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
         body: JSON.stringify({ return_id: id, template_type: templateType }),
       }).catch(() => {});
     }
@@ -653,7 +650,7 @@ export default function ReturnsManagementPage() {
     setSavingNote(true);
     const res = await fetch(`/api/returns/${drawerRow.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ admin_note: adminNote }),
     });
     setSavingNote(false);
@@ -668,7 +665,7 @@ export default function ReturnsManagementPage() {
     const val = exchangePriceDiff.trim() === '' ? null : Number(exchangePriceDiff);
     const res = await fetch(`/api/returns/${drawerRow.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ exchange_price_diff: val }),
     });
     setSavingPriceDiff(false);
@@ -682,7 +679,7 @@ export default function ReturnsManagementPage() {
     setSubmittingNote(true);
     const res = await fetch(`/api/returns/${drawerRow.id}/notes`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ author: 'Yönetici', message: noteInput.trim() }),
     });
     if (res.ok) {
@@ -699,7 +696,7 @@ export default function ReturnsManagementPage() {
     if (!token || !drawerRow) return;
     const res = await fetch(`/api/returns/${drawerRow.id}/notes/${noteId}`, {
       method: 'DELETE',
-      headers: { Authorization: `JWT ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     if (res.ok) {
       setNotes((prev) => prev.filter((n) => n.id !== noteId));
@@ -714,7 +711,7 @@ export default function ReturnsManagementPage() {
     const ids = Array.from(selected);
     const res = await fetch('/api/returns/bulk', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ ids, status }),
     });
     setBulkActionLoading(false);
@@ -730,7 +727,7 @@ export default function ReturnsManagementPage() {
     const ids = Array.from(selected);
     const res = await fetch('/api/returns/bulk', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ ids, admin_note: bulkNote }),
     });
     setBulkNoteLoading(false);
@@ -1255,7 +1252,9 @@ export default function ReturnsManagementPage() {
                 </div>
 
                 {/* Status actions */}
+                {(can('returns.approve') || can('returns.reject') || can('returns.complete')) && (
                 <div className="space-y-2 pt-2 border-t border-border">
+                  {can('returns.approve') && (
                   <Button
                     size="sm"
                     className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -1265,7 +1264,8 @@ export default function ReturnsManagementPage() {
                     <Check className="h-3.5 w-3.5" />
                     Onayla
                   </Button>
-                  {drawerRow.request_type === 'exchange' && (
+                  )}
+                  {drawerRow.request_type === 'exchange' && can('returns.complete') && (
                     <>
                       <Button
                         variant="outline"
@@ -1289,6 +1289,7 @@ export default function ReturnsManagementPage() {
                       </Button>
                     </>
                   )}
+                  {can('returns.reject') && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -1299,7 +1300,9 @@ export default function ReturnsManagementPage() {
                     <X className="h-3.5 w-3.5" />
                     Reddet
                   </Button>
+                  )}
                 </div>
+                )}
               </div>
             </>
           )}
@@ -1318,6 +1321,7 @@ export default function ReturnsManagementPage() {
       {selectedCount > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 shadow-2xl">
           <span className="text-sm font-semibold text-foreground mr-2">{selectedCount} seçili</span>
+          {can('returns.approve') && (
           <Button
             size="sm"
             className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -1327,6 +1331,8 @@ export default function ReturnsManagementPage() {
             <Check className="h-3.5 w-3.5" />
             Onayla
           </Button>
+          )}
+          {can('returns.reject') && (
           <Button
             variant="outline"
             size="sm"
@@ -1337,6 +1343,7 @@ export default function ReturnsManagementPage() {
             <X className="h-3.5 w-3.5" />
             Reddet
           </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

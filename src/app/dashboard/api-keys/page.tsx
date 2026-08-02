@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
@@ -118,7 +118,7 @@ function CreateModal({
     setSaving(true);
     const res = await fetch('/api/api-keys', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ name: name.trim(), expires_at: expiresAt || null }),
     });
     const json = await res.json().catch(() => ({}));
@@ -193,7 +193,7 @@ function LogsPanel({ token, onClose }: { token: string; onClose: () => void }) {
   const load = useCallback(async (p: number) => {
     setLoading(true);
     const res = await fetch(`/api/api-logs?page=${p}&limit=50`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     if (res.ok) {
       const json = await res.json();
@@ -285,7 +285,7 @@ function LogsPanel({ token, onClose }: { token: string; onClose: () => void }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ApiKeysPage() {
-  const [token, setToken] = useState('');
+  const { authHeader: token } = useAuth();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -296,7 +296,7 @@ export default function ApiKeysPage() {
 
   const fetchKeys = useCallback(async (tk: string) => {
     setLoading(true);
-    const res = await fetch('/api/api-keys', { headers: { Authorization: `Bearer ${tk}` } });
+    const res = await fetch('/api/api-keys', { headers: { Authorization: tk } });
     if (res.ok) {
       const json = await res.json();
       setKeys(json.data ?? []);
@@ -305,8 +305,7 @@ export default function ApiKeysPage() {
   }, []);
 
   const init = useCallback(async () => {
-    const tk = await TokenHelpers.getTokenForIframeApp();
-    if (tk) { setToken(tk); await fetchKeys(tk); }
+    if (token) await fetchKeys(token);
     else setLoading(false);
   }, [fetchKeys]);
 
@@ -316,7 +315,7 @@ export default function ApiKeysPage() {
   async function handleRevoke(id: string) {
     const res = await fetch(`/api/api-keys/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     if (res.ok) {
       setKeys((prev) => prev.map((k) => k.id === id ? { ...k, revoked_at: new Date().toISOString(), enabled: false } : k));
@@ -437,7 +436,7 @@ export default function ApiKeysPage() {
       {/* Create modal */}
       {creating && (
         <CreateModal
-          token={token}
+          token={token!}
           onClose={() => setCreating(false)}
           onCreated={(k) => {
             setCreating(false);
@@ -471,7 +470,7 @@ export default function ApiKeysPage() {
       )}
 
       {/* Logs panel */}
-      {showLogs && <LogsPanel token={token} onClose={() => setShowLogs(false)} />}
+      {showLogs && <LogsPanel token={token!} onClose={() => setShowLogs(false)} />}
     </DashboardShell>
   );
 }

@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createAuditLog } from '@/lib/audit/log';
 
 // GET: list rules for merchant
 export async function GET(request: NextRequest) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('automation.view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { data, error } = await supabaseAdmin
     .from('automation_rules')
@@ -25,8 +26,9 @@ export async function GET(request: NextRequest) {
 
 // POST: create a new rule
 export async function POST(request: NextRequest) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('automation.create')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   let body: Record<string, unknown>;
   try {

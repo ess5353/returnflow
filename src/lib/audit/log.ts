@@ -10,12 +10,13 @@ export type AuditAction =
   | 'email_template.updated'
   | 'settings.updated'
   | 'notification.read'
-  | 'export.generated';
+  | 'export.generated'
+  | 'member.invited' | 'member.removed' | 'member.role_changed' | 'member.permissions_updated';
 
 export type AuditEntityType =
   | 'return' | 'exchange'
   | 'automation_rule' | 'webhook' | 'api_key'
-  | 'email_template' | 'settings' | 'notification' | 'export';
+  | 'email_template' | 'settings' | 'notification' | 'export' | 'team_member';
 
 export function createAuditLog(params: {
   merchantId: string;

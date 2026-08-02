@@ -1,11 +1,12 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('api.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const sp = request.nextUrl.searchParams;
   const page = Math.max(1, parseInt(sp.get('page') ?? '1'));

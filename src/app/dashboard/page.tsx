@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
@@ -52,7 +52,7 @@ const STATUS_FILTERS = ['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'] as c
 const PORTAL_URL = 'https://returnflow-git-main-ess7.vercel.app/returns';
 
 export default function DashboardPage() {
-  const [token, setToken] = useState<string | null>(null);
+  const { authHeader: token } = useAuth();
   const [requests, setRequests] = useState<ReturnRequest[]>([]);
   const [orders, setOrders] = useState<IkasOrder[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
@@ -67,7 +67,7 @@ export default function DashboardPage() {
   const { settings, loadSettings: fetchSettings } = useStoreSettings();
 
   const fetchRequests = useCallback(async (t: string) => {
-    const res = await fetch('/api/returns', { headers: { Authorization: `JWT ${t}` } });
+    const res = await fetch('/api/returns', { headers: { Authorization: t } });
     if (!res.ok) {
       toast('İade talepleri alınamadı', 'error');
       setLoading(false);
@@ -81,7 +81,7 @@ export default function DashboardPage() {
   }, []);
 
   const fetchOrders = useCallback(async (t: string) => {
-    const res = await fetch('/api/ikas/orders', { headers: { Authorization: `JWT ${t}` } });
+    const res = await fetch('/api/ikas/orders', { headers: { Authorization: t } });
     const data = await res.json();
     if (data.success) setOrders(data.orders);
   }, []);
@@ -91,23 +91,18 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      const t = await TokenHelpers.getTokenForIframeApp();
-      setToken(t);
-      if (t) {
-        await Promise.all([fetchRequests(t), fetchOrders(t), fetchSettings()]);
-      }
-    };
-    init();
+    if (token) {
+      Promise.all([fetchRequests(token), fetchOrders(token), fetchSettings()]).catch(() => null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   const updateStatus = useCallback(async (status: string) => {
     if (!selectedRequest || !token) return;
     setUpdatingStatus(true);
     const res = await fetch(`/api/returns/${selectedRequest.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ status }),
     });
     setUpdatingStatus(false);
@@ -122,7 +117,7 @@ export default function DashboardPage() {
     setSavingNote(true);
     const res = await fetch(`/api/returns/${selectedRequest.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ admin_note: adminNote }),
     });
     setSavingNote(false);
@@ -135,7 +130,7 @@ export default function DashboardPage() {
     if (!selectedRequest || !token) return;
     const res = await fetch(`/api/returns/${selectedRequest.id}`, {
       method: 'DELETE',
-      headers: { Authorization: `JWT ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     if (!res.ok) { toast('Talep silinemedi', 'error'); return; }
     setDeleteDialogOpen(false);

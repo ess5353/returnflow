@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
@@ -10,8 +10,9 @@ import { createAuditLog } from '@/lib/audit/log';
 
 // ── GET: list all returns for the authenticated merchant ───────────────────
 export async function GET(request: NextRequest) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('returns.view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { data, error } = await supabaseAdmin
     .from('return_requests')

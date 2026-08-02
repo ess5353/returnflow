@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -173,9 +173,9 @@ export default function AnalyticsPage() {
   const [rows, setRows] = useState<ReturnRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
   const [analyticsTab, setAnalyticsTab] = useState<AnalyticsTab>('all');
   const [rangeFilter, setRangeFilter] = useState<RangeFilter>('30d');
+  const { authHeader: token } = useAuth();
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [grouping, setGrouping] = useState<Grouping>('day');
@@ -184,7 +184,6 @@ export default function AnalyticsPage() {
   useEffect(() => {
     AppBridgeHelper.closeLoader();
     setMounted(true);
-    TokenHelpers.getTokenForIframeApp().then(setToken);
   }, []);
 
   useEffect(() => {
@@ -192,7 +191,7 @@ export default function AnalyticsPage() {
   }, [loadSettings]);
 
   const loadData = useCallback(async (t: string) => {
-    const res = await fetch('/api/returns', { headers: { Authorization: `JWT ${t}` } });
+    const res = await fetch('/api/returns', { headers: { Authorization: t } });
     const result = await res.json();
     if (result.data) setRows(result.data as ReturnRow[]);
     setLoading(false);

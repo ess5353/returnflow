@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { SAMPLE_PAYLOADS } from '@/lib/webhooks/events';
 import { attemptDelivery } from '@/lib/webhooks/deliver';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('webhooks.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { id } = await params;
 

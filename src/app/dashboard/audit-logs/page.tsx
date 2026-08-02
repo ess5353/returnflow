@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, RefreshCw, Search } from 'lucide-react';
@@ -136,7 +136,7 @@ function AuditRow({ log }: { log: AuditLog }) {
 }
 
 export default function AuditLogsPage() {
-  const [token, setToken] = useState<string | null>(null);
+  const { authHeader: token } = useAuth();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,7 +159,7 @@ export default function AuditLogsPage() {
     if (dateTo) params.set('date_to', dateTo);
 
     const res = await fetch(`/api/audit-logs?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${t}` },
+      headers: { Authorization: t },
     });
     if (res.ok) {
       const json = await res.json();
@@ -173,11 +173,7 @@ export default function AuditLogsPage() {
     AppBridgeHelper.closeLoader();
   }, []);
 
-  useEffect(() => {
-    TokenHelpers.getTokenForIframeApp().then((t) => {
-      if (t) { setToken(t); fetchLogs(t); }
-    });
-  }, [fetchLogs]);
+  useEffect(() => { if (token) fetchLogs(token); }, [token, fetchLogs]);
 
   function handleSearch() {
     setSearch(searchInput);

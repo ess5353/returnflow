@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
@@ -108,7 +108,7 @@ function WebhookFormModal({
       const method = state.mode === 'edit' ? 'PATCH' : 'POST';
       const res = await fetch(endpoint, {
         method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
         body: JSON.stringify({ name, url, secret, enabled, events: selectedEvents }),
       });
       if (!res.ok) {
@@ -263,7 +263,7 @@ function DeliveryPanel({
   const load = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/webhooks/${webhook.id}/deliveries`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     if (res.ok) {
       const json = await res.json();
@@ -278,7 +278,7 @@ function DeliveryPanel({
     setTesting(true);
     const res = await fetch(`/api/webhooks/${webhook.id}/test`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     const json = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -446,7 +446,7 @@ function WebhookCard({
     const next = !enabled;
     const res = await fetch(`/api/webhooks/${webhook.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
       body: JSON.stringify({ enabled: next }),
     });
     if (res.ok) {
@@ -542,7 +542,7 @@ function WebhookCard({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function WebhooksPage() {
-  const [token, setToken] = useState('');
+  const { authHeader: token } = useAuth();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState | null>(null);
@@ -552,7 +552,7 @@ export default function WebhooksPage() {
   const fetchWebhooks = useCallback(async (tk: string) => {
     setLoading(true);
     const res = await fetch('/api/webhooks', {
-      headers: { Authorization: `Bearer ${tk}` },
+      headers: { Authorization: tk },
     });
     if (res.ok) {
       const json = await res.json();
@@ -561,23 +561,16 @@ export default function WebhooksPage() {
     setLoading(false);
   }, []);
 
-  const init = useCallback(async () => {
-    const tk = await TokenHelpers.getTokenForIframeApp();
-    if (tk) {
-      setToken(tk);
-      await fetchWebhooks(tk);
-    } else {
-      setLoading(false);
-    }
-  }, [fetchWebhooks]);
-
   useEffect(() => { AppBridgeHelper.closeLoader(); }, []);
-  useEffect(() => { init(); }, [init]);
+  useEffect(() => {
+    if (token) fetchWebhooks(token!);
+    else setLoading(false);
+  }, [token, fetchWebhooks]);
 
   async function handleDelete(id: string) {
     const res = await fetch(`/api/webhooks/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     if (res.ok) {
       setWebhooks((prev) => prev.filter((w) => w.id !== id));
@@ -638,7 +631,7 @@ export default function WebhooksPage() {
               <WebhookCard
                 key={wh.id}
                 webhook={wh}
-                token={token}
+                token={token!}
                 onEdit={() => setModal({ mode: 'edit', webhook: wh })}
                 onDelete={() => setDeleteConfirm(wh.id)}
                 onViewLogs={() => setLogsFor(wh)}
@@ -652,11 +645,11 @@ export default function WebhooksPage() {
       {modal && (
         <WebhookFormModal
           state={modal}
-          token={token}
+          token={token!}
           onClose={() => setModal(null)}
           onSaved={() => {
             setModal(null);
-            fetchWebhooks(token);
+            fetchWebhooks(token!);
           }}
         />
       )}
@@ -665,7 +658,7 @@ export default function WebhooksPage() {
       {logsFor && (
         <DeliveryPanel
           webhook={logsFor}
-          token={token}
+          token={token!}
           onClose={() => setLogsFor(null)}
         />
       )}

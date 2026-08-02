@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification, type NotificationType } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
@@ -11,8 +11,9 @@ const NOTIFIABLE_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Tamamlandı'])
 
 // ── PATCH: update status and/or admin_note ─────────────────────────────────
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('returns.view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { id } = await params;
 
@@ -21,6 +22,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  // Per-status permission checks
+  if (body.status === 'Onaylandı' && !user.can('returns.approve')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  if (body.status === 'Reddedildi' && !user.can('returns.reject')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  if (body.status === 'Tamamlandı' && !user.can('returns.complete')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const update: Record<string, unknown> = {};
@@ -123,8 +135,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 // ── DELETE: remove a return ────────────────────────────────────────────────
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('returns.approve')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { id } = await params;
 

@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createAuditLog } from '@/lib/audit/log';
 
 // PATCH: update rule fields; also handles priority swap for move-up/move-down
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('automation.edit')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { id } = await params;
 
@@ -52,8 +53,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 // DELETE: remove a rule and its logs
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('automation.delete')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { id } = await params;
 

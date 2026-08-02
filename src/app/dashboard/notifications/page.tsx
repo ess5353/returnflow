@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppBridgeHelper } from '@ikas/app-helpers';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ type Notification = {
 };
 
 export default function NotificationsPage() {
-  const [token, setToken] = useState<string | null>(null);
+  const { authHeader: token } = useAuth();
   const [items, setItems] = useState<Notification[]>([]);
   const [total, setTotal] = useState(0);
   const [unread, setUnread] = useState(0);
@@ -41,7 +41,7 @@ export default function NotificationsPage() {
     setLoading(true);
     const params = new URLSearchParams({ page: String(p), limit: String(PAGE_SIZE) });
     if (type !== 'all') params.set('type', type);
-    const res = await fetch(`/api/notifications?${params}`, { headers: { Authorization: `JWT ${t}` } });
+    const res = await fetch(`/api/notifications?${params}`, { headers: { Authorization: t } });
     if (!res.ok) { setLoading(false); return; }
     const { data, total: t2, unread: u } = await res.json();
     setItems(data ?? []);
@@ -52,32 +52,25 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     AppBridgeHelper.closeLoader();
-    const init = async () => {
-      const t = await TokenHelpers.getTokenForIframeApp();
-      setToken(t);
-      await loadSettings();
-      if (t) await fetchNotifications(t, 1, 'all');
-      else setLoading(false);
-    };
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    loadSettings();
+  }, [loadSettings]);
 
   useEffect(() => {
     if (token) fetchNotifications(token, page, typeFilter);
+    else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, typeFilter]);
+  }, [token, page, typeFilter]);
 
   const markRead = async (id: string) => {
     if (!token) return;
-    await fetch(`/api/notifications/${id}`, { method: 'PATCH', headers: { Authorization: `JWT ${token}` } });
+    await fetch(`/api/notifications/${id}`, { method: 'PATCH', headers: { Authorization: token ?? '' } });
     setItems((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
     setUnread((u) => Math.max(0, u - 1));
   };
 
   const markAllRead = async () => {
     if (!token) return;
-    await fetch('/api/notifications/read-all', { method: 'PATCH', headers: { Authorization: `JWT ${token}` } });
+    await fetch('/api/notifications/read-all', { method: 'PATCH', headers: { Authorization: token ?? '' } });
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnread(0);
     toast('Tüm bildirimler okundu işaretlendi', 'success');
@@ -85,7 +78,7 @@ export default function NotificationsPage() {
 
   const deleteNotification = async (id: string) => {
     if (!token) return;
-    const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE', headers: { Authorization: `JWT ${token}` } });
+    const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE', headers: { Authorization: token ?? '' } });
     if (!res.ok) { toast('Silme başarısız', 'error'); return; }
     setItems((prev) => prev.filter((n) => n.id !== id));
     setTotal((t) => Math.max(0, t - 1));

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { supabase } from '@/lib/supabase';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,9 +13,9 @@ import { toast } from '@/components/ui/toast';
 import { Upload } from 'lucide-react';
 
 export default function SettingsPage() {
+  const { authHeader: token } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [merchantId, setMerchantId] = useState('');
   const [storeName, setStoreName] = useState('');
@@ -31,7 +31,7 @@ export default function SettingsPage() {
 
   const loadSettings = useCallback(async (t: string) => {
     try {
-      const res = await fetch('/api/settings', { headers: { Authorization: `JWT ${t}` } });
+      const res = await fetch('/api/settings', { headers: { Authorization: t } });
       const result = await res.json();
       if (result.data) {
         const d = result.data;
@@ -54,17 +54,14 @@ export default function SettingsPage() {
     }
   }, []);
 
+  useEffect(() => { AppBridgeHelper.closeLoader(); }, []);
   useEffect(() => {
-    AppBridgeHelper.closeLoader();
-    TokenHelpers.getTokenForIframeApp().then((t) => {
-      setToken(t);
-      if (t) loadSettings(t);
-      else setLoading(false);
-    });
-  }, [loadSettings]);
+    if (token) loadSettings(token);
+    else setLoading(false);
+  }, [token, loadSettings]);
 
   const saveSettings = async () => {
-    const t = token || (await TokenHelpers.getTokenForIframeApp());
+    const t = token;
     if (!t) {
       toast('Oturum bilgisi alınamadı. Sayfayı yenileyip tekrar deneyin.', 'error');
       return;
@@ -90,7 +87,7 @@ export default function SettingsPage() {
 
     const res = await fetch('/api/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${t}` },
+      headers: { 'Content-Type': 'application/json', Authorization: t },
       body: JSON.stringify({
         store_name: storeName,
         notification_email: notificationEmail,

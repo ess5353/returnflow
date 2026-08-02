@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ const TEMPLATE_TYPES: TemplateType[] = [
 type Templates = Record<TemplateType, { subject: string; html: string }>;
 
 export default function EmailTemplatesPage() {
+  const { authHeader } = useAuth();
   const { settings, loadSettings } = useStoreSettings();
   const tokenRef = useRef('');
   const [selected, setSelected] = useState<TemplateType>('return_approved');
@@ -45,7 +46,7 @@ export default function EmailTemplatesPage() {
 
   const loadTemplates = useCallback(async (token: string) => {
     const res = await fetch('/api/email-templates', {
-      headers: { Authorization: `JWT ${token}` },
+      headers: { Authorization: token ?? '' },
     });
     if (res.ok) {
       const json = await res.json();
@@ -59,14 +60,12 @@ export default function EmailTemplatesPage() {
   }, []);
 
   useEffect(() => {
-    TokenHelpers.getTokenForIframeApp().then((token) => {
-      if (token) {
-        tokenRef.current = token;
-        loadTemplates(token);
-      }
-    });
+    if (authHeader) {
+      tokenRef.current = authHeader;
+      loadTemplates(authHeader);
+    }
     loadSettings();
-  }, [loadTemplates, loadSettings]);
+  }, [authHeader, loadTemplates, loadSettings]);
 
   useEffect(() => {
     if (!templates?.[selected]) return;
@@ -89,7 +88,7 @@ export default function EmailTemplatesPage() {
     setSaving(true);
     const res = await fetch(`/api/email-templates/${selected}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${tokenRef.current}` },
+      headers: { 'Content-Type': 'application/json', Authorization: tokenRef.current },
       body: JSON.stringify(templates[selected]),
     });
     setSaving(false);
@@ -100,7 +99,7 @@ export default function EmailTemplatesPage() {
   const reset = async () => {
     const res = await fetch(`/api/email-templates/${selected}`, {
       method: 'DELETE',
-      headers: { Authorization: `JWT ${tokenRef.current}` },
+      headers: { Authorization: tokenRef.current },
     });
     if (res.ok) {
       setTemplates((prev) => {
@@ -123,7 +122,7 @@ export default function EmailTemplatesPage() {
     setTesting(true);
     const res = await fetch('/api/email-templates/test', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${tokenRef.current}` },
+      headers: { 'Content-Type': 'application/json', Authorization: tokenRef.current },
       body: JSON.stringify({ template_type: selected }),
     });
     setTesting(false);

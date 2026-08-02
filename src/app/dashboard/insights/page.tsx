@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { TokenHelpers } from '@/helpers/token-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -293,7 +293,7 @@ function StatCard({ label, value, sub, icon: Icon }: { label: string; value: str
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  const [token, setToken] = useState('');
+  const { authHeader: token } = useAuth();
   const [payload, setPayload] = useState<InsightsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -303,7 +303,7 @@ export default function InsightsPage() {
     if (force) setRefreshing(true);
     else setLoading(true);
     const url = `/api/insights${force ? '?refresh=1' : ''}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${tk}` } });
+    const res = await fetch(url, { headers: { Authorization: tk } });
     if (res.ok) {
       const json = await res.json();
       setPayload(json.data as InsightsPayload);
@@ -314,8 +314,7 @@ export default function InsightsPage() {
   }, []);
 
   const init = useCallback(async () => {
-    const tk = await TokenHelpers.getTokenForIframeApp();
-    if (tk) { setToken(tk); await fetchInsights(tk); }
+    if (token) await fetchInsights(token!);
     else setLoading(false);
   }, [fetchInsights]);
 
@@ -395,7 +394,7 @@ export default function InsightsPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => fetchInsights(token, true)}
+                onClick={() => fetchInsights(token!, true)}
                 disabled={refreshing || loading}
               >
                 <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
@@ -473,7 +472,7 @@ export default function InsightsPage() {
                   <p className="font-medium text-muted-foreground">İçgörüler yüklenemedi</p>
                   <p className="mt-1 text-sm text-muted-foreground">Lütfen sayfayı yenileyin.</p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => fetchInsights(token, true)}>
+                <Button size="sm" variant="outline" onClick={() => fetchInsights(token!, true)}>
                   Tekrar Dene
                 </Button>
               </div>

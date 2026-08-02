@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth-helpers';
+import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createAuditLog, getIp } from '@/lib/audit/log';
 
@@ -8,8 +8,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ type: string }> },
 ) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('email_templates.edit')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { type } = await params;
 
@@ -57,8 +58,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ type: string }> },
 ) {
-  const user = getUserFromRequest(request);
+  const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.can('email_templates.edit')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { type } = await params;
 
