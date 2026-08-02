@@ -1,18 +1,8 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { getAuthContext } from '@/lib/auth/context';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
-
-const upgradeSchema = z.object({
-  plan: z.enum(['pro', 'launch_offer']),
-});
-
-const SUBSCRIPTION_KEYS: Record<string, string | undefined> = {
-  pro: process.env.IKAS_PRO_SUBSCRIPTION_KEY,
-  launch_offer: process.env.IKAS_LAUNCH_OFFER_SUBSCRIPTION_KEY ?? process.env.IKAS_PRO_SUBSCRIPTION_KEY,
-};
 
 export async function POST(request: NextRequest) {
   const user = getAuthContext(request);
@@ -21,21 +11,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  let raw: unknown;
-  try { raw = await request.json(); } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const parsed = upgradeSchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Invalid input' }, { status: 400 });
-  }
-
-  const { plan } = parsed.data;
-  const subscriptionKey = SUBSCRIPTION_KEYS[plan];
-
+  const subscriptionKey = process.env.IKAS_PRO_SUBSCRIPTION_KEY;
   if (!subscriptionKey) {
-    return NextResponse.json({ error: 'Subscription plan not configured' }, { status: 503 });
+    return NextResponse.json({ error: 'Pro subscription plan not configured' }, { status: 503 });
   }
 
   const authToken = await AuthTokenManager.get(user.authorizedAppId);

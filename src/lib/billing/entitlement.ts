@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-export type Plan = 'trial' | 'pro' | 'launch_offer' | 'enterprise' | 'expired';
+export type Plan = 'trial' | 'pro' | 'enterprise' | 'expired';
 export type BillingStatus = 'active' | 'expired' | 'will_expire' | 'cancelled';
 
 export interface Entitlement {
@@ -13,7 +13,6 @@ export interface Entitlement {
   remainingRequests: number | null;  // null = unlimited
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
-  slotNumber: number | null;
   ikasStatus: string | null;
 }
 
@@ -27,7 +26,6 @@ const UNLIMITED: Entitlement = {
   remainingRequests: null,
   trialEndsAt: null,
   currentPeriodEnd: null,
-  slotNumber: null,
   ikasStatus: null,
 };
 
@@ -43,11 +41,8 @@ export async function getBillingEntitlement(merchantId: string): Promise<Entitle
   const now = new Date();
   let isExpired = data.status === 'expired';
 
-  // Check trial time expiry in application layer (belt-and-suspenders with SQL function)
   if (!isExpired && data.plan === 'trial' && data.trial_ends_at) {
-    if (new Date(data.trial_ends_at) < now) {
-      isExpired = true;
-    }
+    if (new Date(data.trial_ends_at) < now) isExpired = true;
   }
 
   const requestsLimit: number = data.requests_limit ?? -1;
@@ -66,7 +61,6 @@ export async function getBillingEntitlement(merchantId: string): Promise<Entitle
     remainingRequests,
     trialEndsAt: data.trial_ends_at ?? null,
     currentPeriodEnd: data.current_period_end ?? null,
-    slotNumber: data.launch_offer_slot_number ?? null,
     ikasStatus: data.ikas_status ?? null,
   };
 }
