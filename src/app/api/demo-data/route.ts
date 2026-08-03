@@ -57,7 +57,7 @@ const DEMO_RETURNS = [
 export async function POST(request: NextRequest) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!user.can('returns.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!user.isOwner) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   // Only allow seeding if there are no existing returns
   const { count } = await supabaseAdmin

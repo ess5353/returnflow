@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/toast';
 
 const STORAGE_KEY = 'pelyx_onboarding_done';
 
-const PORTAL_URL = 'https://returnflow-git-main-ess7.vercel.app/returns';
+const PORTAL_URL = `${process.env.NEXT_PUBLIC_DEPLOY_URL ?? ''}/returns`;
 
 interface Step {
   icon: React.ElementType;

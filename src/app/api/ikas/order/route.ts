@@ -19,11 +19,13 @@ export async function GET(request: NextRequest) {
     }
 
     const ikas = getIkas(authToken);
-    const response = await ikas.queries.listOrder();
+    const response = await ikas.queries.listOrderByNumber({
+      orderNumber: { eq: String(orderNo).replace('#', '') },
+      ...(email ? { customerEmail: { eq: email } } : {}),
+    });
 
-    const rawOrder = response.data?.listOrder?.data?.find(
-      (o: any) => String(o.orderNumber) === String(orderNo).replace('#', ''),
-    );
+    const orders = response.data?.listOrder?.data ?? [];
+    const rawOrder = orders[0];
 
     if (!rawOrder) {
       return NextResponse.json({ success: false, error: 'Order not found' });

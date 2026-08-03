@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     const ikas = getIkas(authToken);
-    const response = await ikas.queries.listOrder();
+    const response = await ikas.queries.listOrders();
 
     const orders =
       response.data?.listOrder?.data?.map((order: any) => ({

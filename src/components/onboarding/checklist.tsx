@@ -20,8 +20,8 @@ const ITEMS: ChecklistItem[] = [
     id: 'portal_link',
     label: 'Müşteri portal linkini paylaş',
     desc: 'Sipariş e-postalarına veya sitenize ekleyin.',
-    href: '/dashboard/settings',
-    linkLabel: 'Ayarlara Git',
+    href: '/dashboard',
+    linkLabel: 'Panele Git',
   },
   {
     id: 'email_setup',

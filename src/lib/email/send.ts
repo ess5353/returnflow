@@ -76,7 +76,7 @@ export async function sendReturnEmail({
   const html = renderTemplate(htmlTpl, vars);
 
   const { error } = await resend.emails.send({
-    from: `${settings?.store_name ?? 'ReturnFlow'} <onboarding@resend.dev>`,
+    from: `${settings?.store_name ?? 'ReturnFlow'} <${process.env.RESEND_FROM_EMAIL ?? 'noreply@pelyx.co'}>`,
     to: [ret.customer_email],
     subject,
     html,

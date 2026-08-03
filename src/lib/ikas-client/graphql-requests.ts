@@ -61,10 +61,42 @@ export const LIST_MERCHANT_APP_PAYMENT = gql`
   }
 `;
 
-export const TEST_ORDERS = gql`
-query listOrder {
-  listOrder {
-    page
+export const LIST_ORDERS = gql`
+query listOrders {
+  listOrder(pagination: { limit: 50, page: 1 }) {
+    count
+    data {
+      id
+      orderNumber
+      orderedAt
+      status
+      currencyCode
+      totalPrice
+
+      customer {
+        firstName
+        lastName
+        email
+      }
+
+      orderLineItems {
+        quantity
+        finalPrice
+
+        variant {
+          id
+          name
+          sku
+        }
+      }
+    }
+  }
+}
+`;
+
+export const LIST_ORDER_BY_NUMBER = gql`
+query listOrderByNumber($orderNumber: StringFilterInput, $customerEmail: StringFilterInput) {
+  listOrder(orderNumber: $orderNumber, customerEmail: $customerEmail, pagination: { limit: 5, page: 1 }) {
     count
     data {
       id

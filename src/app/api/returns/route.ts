@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { Resend } from 'resend';
 import { getAuthContext } from '@/lib/auth/context';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
@@ -10,6 +11,7 @@ import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import { createAuditLog } from '@/lib/audit/log';
 import { rateLimit, getClientIp, LIMITS } from '@/lib/security/rate-limit';
 import { getBillingEntitlement } from '@/lib/billing/entitlement';
+import { evaluateAndApplyAutomation } from '@/lib/automation/evaluate';
 
 const returnSchema = z.object({
   order_id:        z.string().min(1).max(100),
@@ -194,6 +196,36 @@ export async function POST(request: NextRequest) {
     request_type: rType,
     amount: String(amount),
   }).catch(() => undefined);
+
+  // Fire-and-forget: run automation rules server-side
+  if (rType === 'return') {
+    evaluateAndApplyAutomation(inserted.id, merchant_id).catch(() => undefined);
+  }
+
+  // Fire-and-forget: notify merchant via email (never sends to a hardcoded address)
+  (async () => {
+    try {
+      const { data: storeSettings } = await supabaseAdmin
+        .from('store_settings')
+        .select('notification_email, store_name')
+        .eq('merchant_id', merchant_id)
+        .maybeSingle();
+
+      const notifEmail = storeSettings?.notification_email;
+      if (!notifEmail || !process.env.RESEND_API_KEY) return;
+
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'noreply@pelyx.co';
+      const typeLabel = rType === 'exchange' ? 'Değişim' : 'İade';
+
+      await resend.emails.send({
+        from: `${storeSettings?.store_name ?? 'ReturnFlow'} <${fromEmail}>`,
+        to: [notifEmail],
+        subject: `Yeni ${typeLabel} Talebi: ${rf_number}`,
+        html: `<p><strong>${customer_name}</strong> tarafından yeni bir ${typeLabel.toLowerCase()} talebi oluşturuldu.</p><p>Talep No: <strong>${rf_number}</strong></p><p>Sipariş: ${String(order_id)}</p>`,
+      });
+    } catch { /* noop — notification is best-effort */ }
+  })();
 
   return NextResponse.json({ data: inserted });
 }

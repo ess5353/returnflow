@@ -35,21 +35,45 @@ const NAV_BOTTOM: NavItem[] = [
 interface SidebarProps {
   storeName?: string | null;
   logoUrl?: string | null;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ storeName, logoUrl }: SidebarProps) {
+export function Sidebar({ storeName, logoUrl, mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
-  return (
+  const navLinks = (items: NavItem[]) =>
+    items.map(({ href, label, icon: Icon, exact }) => {
+      const active = exact ? pathname === href : pathname.startsWith(href);
+      return (
+        <Link
+          key={href}
+          href={href}
+          title={collapsed ? label : undefined}
+          onClick={onMobileClose}
+          className={cn(
+            'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
+            active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+          )}
+        >
+          <Icon className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="truncate">{label}</span>}
+        </Link>
+      );
+    });
+
+  const sidebarContent = (
     <aside
       className={cn(
-        'relative flex h-full flex-col border-r border-border bg-card transition-[width] duration-300 ease-in-out shrink-0',
-        collapsed ? 'w-14' : 'w-56',
+        'relative flex h-full flex-col border-r border-border bg-card shrink-0',
+        'transition-[width] duration-300 ease-in-out',
+        !mobileOpen ? 'hidden md:flex' : 'flex w-64',
+        !mobileOpen && (collapsed ? 'md:w-14' : 'md:w-56'),
       )}
     >
       {/* Logo */}
-      <div className={cn('flex h-14 items-center gap-2.5 border-b border-border overflow-hidden', collapsed ? 'px-3 justify-center' : 'px-4')}>
+      <div className={cn('flex h-14 items-center gap-2.5 border-b border-border overflow-hidden', collapsed && !mobileOpen ? 'px-3 justify-center' : 'px-4')}>
         {logoUrl ? (
           <img src={logoUrl} alt="Logo" className="h-7 w-7 rounded-md object-contain shrink-0 border border-border bg-white" />
         ) : (
@@ -57,65 +81,60 @@ export function Sidebar({ storeName, logoUrl }: SidebarProps) {
             <ArrowLeftRight className="h-3.5 w-3.5 text-primary" />
           </div>
         )}
-        {!collapsed && (
+        {(!collapsed || mobileOpen) && (
           <span className="truncate text-sm font-semibold text-foreground leading-tight">{storeName || 'ReturnFlow'}</span>
         )}
       </div>
 
-      {/* Nav */}
-      <nav className={cn('flex-1 overflow-y-auto space-y-0.5 py-3', collapsed ? 'px-2' : 'px-3')}>
-        {NAV.map(({ href, label, icon: Icon, exact }) => {
-          const active = exact ? pathname === href : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              className={cn(
-                'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
-                active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </Link>
-          );
-        })}
+      {/* Main nav */}
+      <nav
+        aria-label="Ana Menü"
+        className={cn('flex-1 overflow-y-auto space-y-0.5 py-3', collapsed && !mobileOpen ? 'px-2' : 'px-3')}
+      >
+        {navLinks(NAV)}
       </nav>
 
-      {/* Bottom nav — help / changelog / about */}
-      <div className={cn('border-t border-border py-2 space-y-0.5', collapsed ? 'px-2' : 'px-3')}>
-        {NAV_BOTTOM.map(({ href, label, icon: Icon, exact }) => {
-          const active = exact ? pathname === href : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              className={cn(
-                'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
-                active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        aria-label={collapsed ? 'Genişlet' : 'Daralt'}
-        className="absolute -right-3 top-[3.25rem] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card shadow-sm hover:bg-muted transition-colors z-10"
+      {/* Bottom nav */}
+      <nav
+        aria-label="Yardım ve Bilgi"
+        className={cn('border-t border-border py-2 space-y-0.5', collapsed && !mobileOpen ? 'px-2' : 'px-3')}
       >
-        {collapsed ? (
-          <ChevronRight className="h-3 w-3 text-muted-foreground" />
-        ) : (
-          <ChevronLeft className="h-3 w-3 text-muted-foreground" />
-        )}
-      </button>
+        {navLinks(NAV_BOTTOM)}
+      </nav>
+
+      {/* Collapse toggle — desktop only */}
+      {!mobileOpen && (
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? 'Genişlet' : 'Daralt'}
+          className="absolute -right-3 top-[3.25rem] hidden md:flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card shadow-sm hover:bg-muted transition-colors z-10"
+        >
+          {collapsed ? (
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <ChevronLeft className="h-3 w-3 text-muted-foreground" />
+          )}
+        </button>
+      )}
     </aside>
+  );
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          aria-hidden="true"
+          onClick={onMobileClose}
+        />
+      )}
+      {/* Sidebar — fixed on mobile when open, static on desktop */}
+      {mobileOpen ? (
+        <div className="fixed inset-y-0 left-0 z-50 md:hidden">{sidebarContent}</div>
+      ) : (
+        sidebarContent
+      )}
+    </>
   );
 }

@@ -51,7 +51,7 @@ function statusVariant(status: string): 'pending' | 'approved' | 'rejected' | 's
 
 const DATE_FILTERS = ['Bugün', 'Son 7 Gün', 'Son 30 Gün', 'Bu Ay', 'Tümü'] as const;
 const STATUS_FILTERS = ['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'] as const;
-const PORTAL_URL = 'https://returnflow-git-main-ess7.vercel.app/returns';
+const PORTAL_URL = `${process.env.NEXT_PUBLIC_DEPLOY_URL ?? ''}/returns`;
 
 export default function DashboardPage() {
   const { authHeader: token } = useAuth();

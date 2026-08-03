@@ -1,10 +1,6 @@
-export const dynamic = 'force-dynamic';
-import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
-
-// ── Types ──────────────────────────────────────────────────────────────────
 
 type ReturnRow = {
   id: string;
@@ -39,12 +35,9 @@ type AutomationRule = {
   action_note: string | null;
 };
 
-// ── Evaluation engine (extensible: add new fields/operators here) ──────────
-
 function evaluateCondition(row: ReturnRow, c: Condition): boolean {
   const rawValue = (row as Record<string, unknown>)[c.field];
 
-  // media_urls is a JSON array — needs special handling
   if (c.field === 'media_urls') {
     const arr = Array.isArray(rawValue) ? rawValue : [];
     if (c.operator === 'is_empty') return arr.length === 0;
@@ -76,57 +69,27 @@ function evaluateRule(row: ReturnRow, rule: AutomationRule): boolean {
   return rule.condition_logic === 'OR' ? results.some(Boolean) : results.every(Boolean);
 }
 
-// ── Route ──────────────────────────────────────────────────────────────────
-
-// Called internally after a return is created. Takes the return ID,
-// fetches rules for that merchant, applies first matching rule.
-export async function POST(request: NextRequest) {
-  let body: { return_id: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const { return_id } = body;
-  if (!return_id) return NextResponse.json({ error: 'return_id required' }, { status: 400 });
-
-  // Fetch the return
+export async function evaluateAndApplyAutomation(returnId: string, merchantId: string): Promise<void> {
   const { data: row, error: rowError } = await supabaseAdmin
     .from('return_requests')
     .select('*')
-    .eq('id', return_id)
+    .eq('id', returnId)
     .single();
 
-  if (rowError || !row) {
-    return NextResponse.json({ error: 'Return not found' }, { status: 404 });
-  }
+  if (rowError || !row) return;
 
   const returnRow = row as ReturnRow;
+  if (returnRow.status !== 'Yeni Talep') return;
 
-  // Only evaluate against newly submitted returns
-  if (returnRow.status !== 'Yeni Talep') {
-    return NextResponse.json({ evaluated: false, reason: 'status_not_new' });
-  }
-
-  // Fetch enabled rules for this merchant, ordered by priority
   const { data: rules, error: rulesError } = await supabaseAdmin
     .from('automation_rules')
     .select('*')
-    .eq('merchant_id', returnRow.merchant_id)
+    .eq('merchant_id', merchantId)
     .eq('enabled', true)
     .order('priority', { ascending: true });
 
-  if (rulesError) {
-    console.error('automation rules fetch error:', rulesError);
-    return NextResponse.json({ evaluated: false, reason: 'rules_fetch_error' });
-  }
+  if (rulesError || !rules || rules.length === 0) return;
 
-  if (!rules || rules.length === 0) {
-    return NextResponse.json({ evaluated: true, matched: false });
-  }
-
-  // First-match-wins evaluation
   let matchedRule: AutomationRule | null = null;
   for (const rule of rules as AutomationRule[]) {
     if (evaluateRule(returnRow, rule)) {
@@ -136,21 +99,19 @@ export async function POST(request: NextRequest) {
   }
 
   if (!matchedRule) {
-    // Log all rules as unmatched (only log if there are rules to evaluate)
     await supabaseAdmin.from('automation_logs').insert(
       (rules as AutomationRule[]).map((r) => ({
-        merchant_id: returnRow.merchant_id,
+        merchant_id: merchantId,
         rule_id: r.id,
-        return_request_id: return_id,
+        return_request_id: returnId,
         rule_name: r.name,
         matched: false,
         action_taken: null,
       })),
     );
-    return NextResponse.json({ evaluated: true, matched: false });
+    return;
   }
 
-  // Apply action
   const ACTION_STATUS: Record<string, string> = {
     auto_approve: 'Onaylandı',
     auto_reject: 'Reddedildi',
@@ -170,35 +131,30 @@ export async function POST(request: NextRequest) {
   await supabaseAdmin
     .from('return_requests')
     .update({ status: newStatus, admin_note: adminNote })
-    .eq('id', return_id);
+    .eq('id', returnId);
 
-  // Log the matched rule
-  await supabaseAdmin.from('automation_logs').insert([
-    {
-      merchant_id: returnRow.merchant_id,
-      rule_id: matchedRule.id,
-      return_request_id: return_id,
-      rule_name: matchedRule.name,
-      matched: true,
-      action_taken: newStatus,
-    },
-  ]);
+  await supabaseAdmin.from('automation_logs').insert([{
+    merchant_id: merchantId,
+    rule_id: matchedRule.id,
+    return_request_id: returnId,
+    rule_name: matchedRule.name,
+    matched: true,
+    action_taken: newStatus,
+  }]);
 
   createNotification({
-    merchantId: returnRow.merchant_id,
+    merchantId,
     type: 'automation_triggered',
     title: `Otomasyon: ${matchedRule.name}`,
     message: `${notePrefix} · ${returnRow.rf_number}`,
-    relatedReturnId: return_id,
+    relatedReturnId: returnId,
   });
 
-  triggerWebhookEvent(returnRow.merchant_id, 'automation.triggered', {
-    return_request_id: return_id,
+  triggerWebhookEvent(merchantId, 'automation.triggered', {
+    return_request_id: returnId,
     rf_number: returnRow.rf_number,
     rule_name: matchedRule.name,
     action_taken: matchedRule.action,
     matched: true,
   }).catch(() => undefined);
-
-  return NextResponse.json({ evaluated: true, matched: true, action: newStatus, rule: matchedRule.name });
 }

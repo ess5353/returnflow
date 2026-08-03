@@ -47,6 +47,7 @@ export default function ReturnsPage() {
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<FileList | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFindingOrder, setIsFindingOrder] = useState(false);
   const [email, setEmail] = useState('');
   const [orderNo, setOrderNo] = useState('');
   const [order, setOrder] = useState<Record<string, unknown> | null>(null);
@@ -122,39 +123,22 @@ export default function ReturnsPage() {
 
     const rfNumber: string = result.data.rf_number;
 
-    if (requestType === 'return') {
-      fetch('/api/automation/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ return_id: result.data.id }),
-      }).catch(() => {});
-    }
-
-    fetch('/api/email/return-created', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        customerName: (order as Record<string, unknown>).customer_name,
-        rfNumber,
-        orderNo: (order as Record<string, unknown>).order_no,
-      }),
-    }).catch(() => {});
-
     setCreatedRfNumber(rfNumber);
     setIsSubmitting(false);
     setStep('success');
   };
 
   const findOrder = async () => {
-    if (!settings?.merchant_id) {
-      toast('Mağaza bilgisi yüklenemedi', 'error');
+    if (!orderNo.trim() || !email.trim()) {
+      toast('Sipariş numarası ve e-posta gerekli', 'error');
       return;
     }
 
+    setIsFindingOrder(true);
     const url = `/api/ikas/order?orderNo=${encodeURIComponent(orderNo)}&email=${encodeURIComponent(email)}`;
     const response = await fetch(url);
     const result = await response.json();
+    setIsFindingOrder(false);
 
     if (!result.success) {
       toast('Sipariş bulunamadı', 'error');
@@ -177,8 +161,8 @@ export default function ReturnsPage() {
         <div className="rounded-3xl bg-white shadow-xl overflow-hidden border border-gray-100">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr]">
 
-            {/* ── Left panel ─────────────────────────────────────────────── */}
-            <div style={{ background: accentColor }} className="text-white p-8 md:p-10 relative overflow-hidden">
+            {/* ── Left panel — hidden on small screens ───────────────────── */}
+            <div style={{ background: accentColor }} className="hidden lg:block text-white p-8 md:p-10 relative overflow-hidden">
               <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/10" />
               <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-white/5" />
 
@@ -265,10 +249,11 @@ export default function ReturnsPage() {
                     </div>
                     <button
                       onClick={findOrder}
+                      disabled={isFindingOrder}
                       style={{ background: accentColor }}
-                      className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90"
+                      className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
                     >
-                      Siparişimi Bul
+                      {isFindingOrder ? 'Aranıyor...' : 'Siparişimi Bul'}
                     </button>
                   </div>
                 </>
@@ -411,10 +396,17 @@ export default function ReturnsPage() {
                       type="file"
                       multiple
                       accept="image/*,video/*"
-                      onChange={(e) => setFiles(e.target.files)}
+                      onChange={(e) => {
+                        const fl = e.target.files;
+                        if (fl) {
+                          const oversized = Array.from(fl).find((f) => f.size > 10 * 1024 * 1024);
+                          if (oversized) { toast('Dosya boyutu 10 MB sınırını aşıyor', 'error'); e.target.value = ''; return; }
+                        }
+                        setFiles(fl);
+                      }}
                       className="w-full rounded-xl border border-gray-200 p-4 text-sm"
                     />
-                    <p className="mt-1.5 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV desteklenir.</p>
+                    <p className="mt-1.5 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV — maks 10 MB.</p>
                   </div>
 
                   <button
@@ -496,10 +488,17 @@ export default function ReturnsPage() {
                       type="file"
                       multiple
                       accept="image/*,video/*"
-                      onChange={(e) => setFiles(e.target.files)}
+                      onChange={(e) => {
+                        const fl = e.target.files;
+                        if (fl) {
+                          const oversized = Array.from(fl).find((f) => f.size > 10 * 1024 * 1024);
+                          if (oversized) { toast('Dosya boyutu 10 MB sınırını aşıyor', 'error'); e.target.value = ''; return; }
+                        }
+                        setFiles(fl);
+                      }}
                       className="w-full rounded-xl border border-gray-200 p-4 text-sm"
                     />
-                    <p className="mt-1.5 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV desteklenir.</p>
+                    <p className="mt-1.5 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV — maks 10 MB.</p>
                   </div>
 
                   <button

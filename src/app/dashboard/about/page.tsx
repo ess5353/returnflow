@@ -7,7 +7,7 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { ArrowLeftRight, ExternalLink, Github, Globe, Mail, Shield, Zap } from 'lucide-react';
 
 const VERSION = '0.1.0';
-const BUILD_DATE = '2026';
+const BUILD_DATE = new Date().getFullYear();
 
 const FEATURES = [
   { icon: ArrowLeftRight, label: 'İade & Değişim Yönetimi', desc: 'Müşteri taleplerini tek panelden takip edin.' },

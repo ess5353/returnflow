@@ -11,8 +11,11 @@ const ENV_MANIFEST: Omit<EnvEntry, 'present'>[] = [
   { key: 'CLIENT_SECRET',                isSecret: true,  required: true,  note: 'ikas OAuth + JWT signing key' },
   { key: 'SUPABASE_SERVICE_ROLE_KEY',    isSecret: true,  required: true,  note: 'Supabase admin access (server-side only)' },
   { key: 'RESEND_API_KEY',               isSecret: true,  required: false, note: 'Required for email features' },
-  { key: 'OPENAI_API_KEY',               isSecret: true,  required: false, note: 'Required for AI Insights feature' },
-  { key: 'CRON_SECRET',                  isSecret: true,  required: false, note: 'Protects cron/webhook retry endpoints' },
+  { key: 'RESEND_FROM_EMAIL',            isSecret: false, required: false, note: 'Verified sender address for Resend (e.g. noreply@yourdomain.com)' },
+  { key: 'OPENAI_API_KEY',              isSecret: true,  required: false, note: 'Required for AI Insights feature' },
+  { key: 'CRON_SECRET',                  isSecret: true,  required: true,  note: 'Protects billing/sync cron endpoint — required' },
+  { key: 'IKAS_PRO_SUBSCRIPTION_KEY',   isSecret: false, required: true,  note: 'ikas App Store subscription key for the Pro plan' },
+  { key: 'INTERNAL_SECRET',             isSecret: true,  required: false, note: 'Internal API-to-API auth header for server-side calls' },
   { key: 'NEXT_PUBLIC_CLIENT_ID',        isSecret: false, required: true,  note: 'ikas OAuth client ID' },
   { key: 'NEXT_PUBLIC_GRAPH_API_URL',    isSecret: false, required: true,  note: 'ikas Admin GraphQL endpoint' },
   { key: 'NEXT_PUBLIC_ADMIN_URL',        isSecret: false, required: true,  note: 'ikas Admin panel URL (for iframe embedding)' },
@@ -49,7 +52,6 @@ export function computeSecurityScore(): { score: number; max: number; checks: Re
     'HTTPS deploy URL': httpsDeployUrl,
     'Rate limiting active': true,              // always true after Phase 6
     'Input validation': true,                  // always true after Phase 6
-    'Authorization on all routes': true,       // always true after Phase 6
     'CSRF protection': true,                   // JWT-in-header scheme
     'Cron secret set': hasCronSecret,
     'Email service configured': hasResend,
@@ -63,7 +65,6 @@ export function computeSecurityScore(): { score: number; max: number; checks: Re
     'HTTPS deploy URL': 10,
     'Rate limiting active': 10,
     'Input validation': 10,
-    'Authorization on all routes': 15,
     'CSRF protection': 5,
     'Cron secret set': 5,
     'Email service configured': 5,

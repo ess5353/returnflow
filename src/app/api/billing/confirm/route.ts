@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
   }
 
   const payments = paymentsResp.data.listMerchantAppPayment.data ?? [];
-  const recentPaid = payments.find((p) => p.status === 'PAID');
+  const sevenDaysAgo = Date.now() - 7 * 86400 * 1000;
+  const recentPaid = payments.find(
+    (p) => p.status === 'PAID' && p.paymentDate != null && p.paymentDate > sevenDaysAgo,
+  );
 
   if (recentPaid) {
     // Payment confirmed — sync billing record
