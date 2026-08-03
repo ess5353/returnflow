@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
     .from('return_requests')
     .select('*')
     .eq('merchant_id', user.merchantId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(200);
 
   if (error) {
     console.error('returns GET error:', error);
@@ -99,6 +100,21 @@ export async function POST(request: NextRequest) {
   if (!merchant_id) {
     console.error('returns POST: merchant_id could not be resolved');
     return NextResponse.json({ error: 'Merchant not found' }, { status: 500 });
+  }
+
+  // Enforce operation mode server-side
+  const { data: merchantSettings } = await supabaseAdmin
+    .from('store_settings')
+    .select('operation_mode')
+    .eq('merchant_id', merchant_id)
+    .maybeSingle();
+
+  const opMode = merchantSettings?.operation_mode ?? 'both';
+  if (opMode === 'return_only' && rType === 'exchange') {
+    return NextResponse.json({ error: 'Bu mağaza yalnızca iade taleplerini kabul etmektedir.' }, { status: 400 });
+  }
+  if (opMode === 'exchange_only' && rType === 'return') {
+    return NextResponse.json({ error: 'Bu mağaza yalnızca değişim taleplerini kabul etmektedir.' }, { status: 400 });
   }
 
   // Billing gate — block if trial expired or subscription cancelled

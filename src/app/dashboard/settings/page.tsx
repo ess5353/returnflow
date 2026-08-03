@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [returnInstructions, setReturnInstructions] = useState('');
   const [returnDeadlineDays, setReturnDeadlineDays] = useState('');
   const [returnPolicy, setReturnPolicy] = useState('');
+  const [operationMode, setOperationMode] = useState<'both' | 'return_only' | 'exchange_only'>('both');
 
   const loadSettings = useCallback(async (t: string) => {
     try {
@@ -46,6 +47,8 @@ export default function SettingsPage() {
         setReturnInstructions(d.return_instructions || '');
         setReturnDeadlineDays(d.return_deadline_days != null ? String(d.return_deadline_days) : '');
         setReturnPolicy(d.return_policy || '');
+        const mode = d.operation_mode;
+        setOperationMode(mode === 'return_only' || mode === 'exchange_only' ? mode : 'both');
       }
     } catch (e) {
       console.error(e);
@@ -99,6 +102,7 @@ export default function SettingsPage() {
         return_instructions: returnInstructions,
         return_deadline_days: returnDeadlineDays ? Number(returnDeadlineDays) : null,
         return_policy: returnPolicy,
+        operation_mode: operationMode,
       }),
     });
 
@@ -280,6 +284,57 @@ export default function SettingsPage() {
                     rows={6}
                   />
                 </div>
+              </div>
+            </section>
+
+            {/* Çalışma Modu */}
+            <section>
+              <h2 className="text-sm font-semibold border-b border-border pb-2 mb-4">Çalışma Modu</h2>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Mağazanızın hangi tür talepleri kabul edeceğini seçin. Müşteri portalı bu ayara göre uyum sağlar.
+              </p>
+              <div className="space-y-2">
+                {([
+                  {
+                    value: 'both',
+                    title: 'İade ve Değişim (Varsayılan)',
+                    description: 'Müşteriler hem iade hem de değişim talebi oluşturabilir.',
+                  },
+                  {
+                    value: 'return_only',
+                    title: 'Sadece İade',
+                    description: 'Yalnızca iade talebi kabul edilir. Portalda değişim seçeneği görünmez.',
+                  },
+                  {
+                    value: 'exchange_only',
+                    title: 'Sadece Değişim',
+                    description: 'Yalnızca değişim talebi kabul edilir. Portalda iade seçeneği görünmez.',
+                  },
+                ] as const).map((opt) => {
+                  const isSelected = operationMode === opt.value;
+                  return (
+                    <label
+                      key={opt.value}
+                      className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 px-4 py-3 transition-colors ${
+                        isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="operationMode"
+                        value={opt.value}
+                        checked={isSelected}
+                        onChange={() => setOperationMode(opt.value)}
+                        className="mt-1 shrink-0"
+                        style={{ accentColor: '#6f55ff' }}
+                      />
+                      <div>
+                        <p className="text-sm font-semibold">{opt.title}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{opt.description}</p>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             </section>
 

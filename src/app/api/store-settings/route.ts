@@ -10,6 +10,9 @@ export type PublicStoreSettings = {
   primary_color: string | null;
   support_email: string | null;
   return_policy: string | null;
+  operation_mode: string | null;
+  return_instructions: string | null;
+  contact_phone: string | null;
 };
 
 export async function GET() {
@@ -31,7 +34,7 @@ export async function GET() {
 
     const { data, error } = await supabaseAdmin
       .from('store_settings')
-      .select('merchant_id, store_name, logo_url, primary_color, support_email, return_policy')
+      .select('merchant_id, store_name, logo_url, primary_color, support_email, return_policy, operation_mode, return_instructions, contact_phone')
       .eq('merchant_id', merchantId)
       .maybeSingle();
 
@@ -49,6 +52,9 @@ export async function GET() {
       primary_color: null,
       support_email: null,
       return_policy: null,
+      operation_mode: null,
+      return_instructions: null,
+      contact_phone: null,
     };
 
     return NextResponse.json({ data: settings });

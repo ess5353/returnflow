@@ -15,6 +15,7 @@ const settingsSchema = z.object({
   contact_phone:         z.string().max(30).nullable().optional(),
   return_instructions:   z.string().max(5_000).nullable().optional(),
   return_deadline_days:  z.number().int().min(0).max(365).nullable().optional(),
+  operation_mode:        z.enum(['both', 'return_only', 'exchange_only']).nullable().optional(),
 }).strip();
 
 export async function GET(request: NextRequest) {
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
       contact_phone: body.contact_phone ?? null,
       return_instructions: body.return_instructions ?? null,
       return_deadline_days: body.return_deadline_days ?? null,
+      operation_mode: body.operation_mode ?? null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'merchant_id' },

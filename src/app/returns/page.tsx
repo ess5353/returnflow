@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/toast';
 import type { PublicStoreSettings } from '@/app/api/store-settings/route';
 import { ArrowLeftRight, RotateCcw } from 'lucide-react';
+
+type OperationMode = 'both' | 'return_only' | 'exchange_only';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -150,10 +152,48 @@ export default function ReturnsPage() {
   };
 
   const accentColor = settings?.primary_color || '#000000';
-  const STEPS = ['Sipariş Bul', 'Ürün Seç', 'Talep Türü', requestType === 'exchange' ? 'Değişim Detayı' : 'Sebep Gir'];
-  const stepIndex = step === 'search' ? 0 : step === 'order' ? 1 : step === 'type' ? 2 : (step === 'reason' || step === 'exchange') ? 3 : 4;
+  const operationMode: OperationMode = useMemo(() => {
+    const mode = settings?.operation_mode;
+    if (mode === 'return_only' || mode === 'exchange_only') return mode;
+    return 'both';
+  }, [settings?.operation_mode]);
+
+  // In single-mode configs, lock the requestType and skip the "type" step entirely.
+  useEffect(() => {
+    if (operationMode === 'return_only' && requestType !== 'return') {
+      setRequestType('return');
+    } else if (operationMode === 'exchange_only' && requestType !== 'exchange') {
+      setRequestType('exchange');
+    }
+  }, [operationMode, requestType]);
+
+  // If we somehow land on "type" step in single-mode, forward automatically.
+  useEffect(() => {
+    if (step !== 'type') return;
+    if (operationMode === 'return_only') setStep('reason');
+    else if (operationMode === 'exchange_only') setStep('exchange');
+  }, [operationMode, step]);
+
+  const STEPS = operationMode === 'return_only'
+    ? ['Sipariş Bul', 'Ürün Seç', 'Sebep Gir']
+    : operationMode === 'exchange_only'
+      ? ['Sipariş Bul', 'Ürün Seç', 'Değişim Detayı']
+      : ['Sipariş Bul', 'Ürün Seç', 'Talep Türü', requestType === 'exchange' ? 'Değişim Detayı' : 'Sebep Gir'];
+
+  const stepIndex = operationMode === 'both'
+    ? (step === 'search' ? 0 : step === 'order' ? 1 : step === 'type' ? 2 : (step === 'reason' || step === 'exchange') ? 3 : 4)
+    : (step === 'search' ? 0 : step === 'order' ? 1 : (step === 'reason' || step === 'exchange') ? 2 : 3);
+
   const canSubmitExchange = exchangeType !== null && exchangeVariant.trim().length > 0;
   const orderItems = ((order as Record<string, unknown>)?.items as { name: string; quantity: number; price: number }[]) ?? [];
+
+  const heroTitle = operationMode === 'return_only'
+    ? 'İade Merkezi'
+    : operationMode === 'exchange_only'
+      ? 'Değişim Merkezi'
+      : (requestType === 'exchange' && step !== 'type' ? 'Değişim Merkezi' : 'İade & Değişim');
+
+  const brandName = settings?.store_name || 'Mağaza';
 
   return (
     <main className="min-h-screen bg-[#f5f6fa] px-4 py-8 md:p-10">
@@ -173,25 +213,35 @@ export default function ReturnsPage() {
                   )}
                   <div>
                     <div className="text-[10px] font-bold tracking-[0.3em] text-white/60 uppercase">Müşteri Hizmetleri</div>
-                    <div className="text-lg font-bold leading-tight">{settings?.store_name || 'PELYXCOMMERCE'}</div>
+                    <div className="text-lg font-bold leading-tight">{brandName}</div>
                   </div>
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-none">
-                  {requestType === 'exchange' && step !== 'type' ? 'Değişim Merkezi' : 'İade & Değişim'}
+                  {heroTitle}
                 </h1>
                 <p className="mt-4 text-white/70 text-base leading-7">
                   Sipariş bilgilerinizi girin, talebinizi birkaç adımda oluşturun.
                 </p>
 
-                {settings?.support_email && (
-                  <p className="mt-5 text-sm text-white/60">Destek: {settings.support_email}</p>
+                {(settings?.support_email || settings?.contact_phone) && (
+                  <div className="mt-5 space-y-1 text-sm text-white/60">
+                    {settings?.support_email && <p>Destek: {settings.support_email}</p>}
+                    {settings?.contact_phone && <p>Telefon: {settings.contact_phone}</p>}
+                  </div>
                 )}
 
                 {settings?.return_policy && (
                   <div className="mt-5 rounded-2xl bg-white/10 p-4 text-sm leading-6 text-white/90 border border-white/10">
                     <strong className="block mb-1">İade Politikası</strong>
                     <p className="whitespace-pre-line text-white/80">{settings.return_policy}</p>
+                  </div>
+                )}
+
+                {settings?.return_instructions && (
+                  <div className="mt-3 rounded-2xl bg-white/10 p-4 text-sm leading-6 text-white/90 border border-white/10">
+                    <strong className="block mb-1">Nasıl İade Ederim?</strong>
+                    <p className="whitespace-pre-line text-white/80">{settings.return_instructions}</p>
                   </div>
                 )}
 
@@ -213,7 +263,7 @@ export default function ReturnsPage() {
             </div>
 
             {/* ── Right panel ────────────────────────────────────────────── */}
-            <div className="p-7 md:p-10">
+            <div className="p-4 sm:p-7 md:p-10">
 
               {/* STEP: Search */}
               {step === 'search' && (
@@ -301,7 +351,11 @@ export default function ReturnsPage() {
 
                   <button
                     disabled={selectedItems.length === 0}
-                    onClick={() => setStep('type')}
+                    onClick={() => {
+                      if (operationMode === 'return_only') { setRequestType('return'); setStep('reason'); }
+                      else if (operationMode === 'exchange_only') { setRequestType('exchange'); setStep('exchange'); }
+                      else setStep('type');
+                    }}
                     style={{ background: accentColor }}
                     className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-30"
                   >
@@ -417,7 +471,7 @@ export default function ReturnsPage() {
                   >
                     {isSubmitting ? 'Yükleniyor...' : 'İade Talebi Oluştur'}
                   </button>
-                  <button onClick={() => setStep('type')} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                  <button onClick={() => setStep(operationMode === 'both' ? 'type' : 'order')} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors">
                     ← Geri Dön
                   </button>
                 </>
@@ -509,7 +563,7 @@ export default function ReturnsPage() {
                   >
                     {isSubmitting ? 'Yükleniyor...' : 'Değişim Talebi Oluştur'}
                   </button>
-                  <button onClick={() => setStep('type')} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                  <button onClick={() => setStep(operationMode === 'both' ? 'type' : 'order')} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors">
                     ← Geri Dön
                   </button>
                 </>
