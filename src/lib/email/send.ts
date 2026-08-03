@@ -75,8 +75,14 @@ export async function sendReturnEmail({
   const subject = renderTemplate(subjectTpl, vars);
   const html = renderTemplate(htmlTpl, vars);
 
+  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  if (!fromEmail) {
+    console.error('RESEND_FROM_EMAIL is not set — cannot send customer email');
+    return { ok: false, error: 'Email sender not configured' };
+  }
+
   const { error } = await resend.emails.send({
-    from: `${settings?.store_name ?? 'ReturnFlow'} <${process.env.RESEND_FROM_EMAIL ?? 'noreply@pelyx.co'}>`,
+    from: `${settings?.store_name ?? 'ReturnFlow'} <${fromEmail}>`,
     to: [ret.customer_email],
     subject,
     html,

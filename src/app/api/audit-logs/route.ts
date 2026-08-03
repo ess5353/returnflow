@@ -38,9 +38,13 @@ export async function GET(request: NextRequest) {
     query = query.lt('created_at', end.toISOString());
   }
   if (search) {
-    query = query.or(
-      `action.ilike.%${search}%,entity_id.ilike.%${search}%,entity_type.ilike.%${search}%`,
-    );
+    // Strip characters that could inject extra PostgREST filter predicates.
+    const safe = search.replace(/[^A-Za-z0-9\s\-_.]/g, '').trim().slice(0, 100);
+    if (safe) {
+      query = query.or(
+        `action.ilike.%${safe}%,entity_id.ilike.%${safe}%,entity_type.ilike.%${safe}%`,
+      );
+    }
   }
 
   const { data, error, count } = await query;

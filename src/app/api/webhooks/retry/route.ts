@@ -4,17 +4,14 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { attemptDelivery } from '@/lib/webhooks/deliver';
 
 export async function POST(request: NextRequest) {
-  // Auth: user JWT or CRON_SECRET
   const cronSecret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get('authorization') ?? '';
-  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'Cron secret not configured' }, { status: 503 });
+  }
 
-  if (!isCron) {
-    // Require valid user JWT otherwise (optional — just rejects unauthenticated callers)
-    const authorization = authHeader.replace('Bearer ', '');
-    if (!authorization) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const authHeader = request.headers.get('authorization') ?? '';
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const now = new Date().toISOString();

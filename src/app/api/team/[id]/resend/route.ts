@@ -54,7 +54,13 @@ export async function POST(
     .update({ invited_at: new Date().toISOString(), status: 'invited' })
     .eq('id', id);
 
-  const inviteUrl = `${process.env.NEXT_PUBLIC_DEPLOY_URL}/access?token=${token}`;
+  const deployUrl = process.env.NEXT_PUBLIC_DEPLOY_URL;
+  if (!deployUrl) {
+    console.error('NEXT_PUBLIC_DEPLOY_URL is not set — cannot construct invitation link');
+    return NextResponse.json({ error: 'Deployment URL not configured' }, { status: 503 });
+  }
+
+  const inviteUrl = `${deployUrl}/access?token=${token}`;
 
   return NextResponse.json({ data: { invite_url: inviteUrl } });
 }

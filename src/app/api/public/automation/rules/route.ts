@@ -6,9 +6,9 @@ import { withPublicAuth } from '@/lib/public-api/handler';
 export const GET = withPublicAuth('/api/public/automation/rules', async (_request: NextRequest, ctx) => {
   const { data, error } = await supabaseAdmin
     .from('automation_rules')
-    .select('id, name, enabled, priority, condition_logic, conditions, action, created_at')
+    .select('id, name, enabled, created_at, updated_at')
     .eq('merchant_id', ctx.merchantId)
-    .order('priority', { ascending: true });
+    .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: 'Query failed', code: 'DB_ERROR' }, { status: 500 });
 

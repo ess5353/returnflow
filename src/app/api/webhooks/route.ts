@@ -4,6 +4,7 @@ import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WebhookEvent } from '@/lib/webhooks/events';
 import { createAuditLog, getIp } from '@/lib/audit/log';
+import { validateWebhookUrl } from '@/lib/webhooks/ssrf-guard';
 
 export async function GET(request: NextRequest) {
   const user = getAuthContext(request);
@@ -42,10 +43,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'name, url, and secret are required' }, { status: 400 });
   }
 
-  try {
-    new URL(url);
-  } catch {
-    return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+  const urlCheck = await validateWebhookUrl(url);
+  if (!urlCheck.ok) {
+    return NextResponse.json({ error: urlCheck.error ?? 'Invalid URL' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin

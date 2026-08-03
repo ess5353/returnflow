@@ -66,8 +66,14 @@ export async function POST(request: NextRequest) {
   const subject = `[Test] ${renderTemplate(subjectTpl, vars)}`;
   const html = renderTemplate(htmlTpl, vars);
 
+  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  if (!fromEmail) {
+    console.error('RESEND_FROM_EMAIL is not set — cannot send test email');
+    return NextResponse.json({ error: 'Email sender not configured — set RESEND_FROM_EMAIL' }, { status: 503 });
+  }
+
   const { error } = await resend.emails.send({
-    from: `${settings?.store_name ?? 'ReturnFlow'} <${process.env.RESEND_FROM_EMAIL ?? 'noreply@pelyx.co'}>`,
+    from: `${settings?.store_name ?? 'ReturnFlow'} <${fromEmail}>`,
     to: [toEmail],
     subject,
     html,

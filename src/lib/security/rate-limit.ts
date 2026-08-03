@@ -1,7 +1,14 @@
 /**
  * In-process rate limiter using a sliding window counter.
- * Works per warm serverless instance. For multi-instance distributed limiting,
- * replace the backing store with Upstash Redis or a Supabase RPC.
+ *
+ * LIMITATION: Each serverless instance has its own Map. On Vercel with concurrent
+ * instances the effective limit per key is (max × instance_count) — this is NOT
+ * a distributed rate limiter. It provides coarse abuse prevention only.
+ *
+ * The Public API rate limiter (src/lib/public-api/rate-limit.ts) counts requests
+ * in the api_logs Supabase table and is accurate across all instances.
+ *
+ * To make this distributed: replace the Map with Upstash Redis or a Supabase RPC.
  */
 
 interface Entry {

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WebhookEvent, WebhookPayload } from './events';
+import { validateWebhookUrl } from './ssrf-guard';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_SECONDS = [60, 300, 1800]; // 1min, 5min, 30min
@@ -25,6 +26,16 @@ export async function attemptDelivery(deliveryId: string): Promise<void> {
     await supabaseAdmin
       .from('webhook_deliveries')
       .update({ status: 'skipped' })
+      .eq('id', deliveryId);
+    return;
+  }
+
+  // Re-validate URL immediately before delivery to guard against DNS rebinding.
+  const urlCheck = await validateWebhookUrl(webhook.url);
+  if (!urlCheck.ok) {
+    await supabaseAdmin
+      .from('webhook_deliveries')
+      .update({ status: 'failed', response_body: `SSRF guard: ${urlCheck.error}`, next_retry_at: null })
       .eq('id', deliveryId);
     return;
   }

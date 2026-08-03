@@ -4,6 +4,7 @@ import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { SAMPLE_PAYLOADS } from '@/lib/webhooks/events';
 import { attemptDelivery } from '@/lib/webhooks/deliver';
+import { validateWebhookUrl } from '@/lib/webhooks/ssrf-guard';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = getAuthContext(request);
@@ -14,12 +15,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: webhook } = await supabaseAdmin
     .from('webhooks')
-    .select('id, enabled')
+    .select('id, url, enabled')
     .eq('id', id)
     .eq('merchant_id', user.merchantId)
     .single();
 
   if (!webhook) return NextResponse.json({ error: 'Webhook not found' }, { status: 404 });
+
+  // Validate the stored URL before firing a test delivery
+  const urlCheck = await validateWebhookUrl((webhook as { url: string }).url);
+  if (!urlCheck.ok) {
+    return NextResponse.json({ error: `Webhook URL rejected: ${urlCheck.error}` }, { status: 400 });
+  }
 
   const testPayload = SAMPLE_PAYLOADS['return.created'];
 

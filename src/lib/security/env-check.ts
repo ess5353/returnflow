@@ -11,7 +11,7 @@ const ENV_MANIFEST: Omit<EnvEntry, 'present'>[] = [
   { key: 'CLIENT_SECRET',                isSecret: true,  required: true,  note: 'ikas OAuth + JWT signing key' },
   { key: 'SUPABASE_SERVICE_ROLE_KEY',    isSecret: true,  required: true,  note: 'Supabase admin access (server-side only)' },
   { key: 'RESEND_API_KEY',               isSecret: true,  required: false, note: 'Required for email features' },
-  { key: 'RESEND_FROM_EMAIL',            isSecret: false, required: false, note: 'Verified sender address for Resend (e.g. noreply@yourdomain.com)' },
+  { key: 'RESEND_FROM_EMAIL',            isSecret: false, required: true,  note: 'Verified sender address for Resend — required, e.g. noreply@yourdomain.com' },
   { key: 'OPENAI_API_KEY',              isSecret: true,  required: false, note: 'Required for AI Insights feature' },
   { key: 'CRON_SECRET',                  isSecret: true,  required: true,  note: 'Protects billing/sync cron endpoint — required' },
   { key: 'IKAS_PRO_SUBSCRIPTION_KEY',   isSecret: false, required: true,  note: 'ikas App Store subscription key for the Pro plan' },

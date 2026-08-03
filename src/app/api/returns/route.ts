@@ -205,6 +205,13 @@ export async function POST(request: NextRequest) {
   // Fire-and-forget: notify merchant via email (never sends to a hardcoded address)
   (async () => {
     try {
+      const fromEmail = process.env.RESEND_FROM_EMAIL;
+      if (!fromEmail) {
+        console.error('RESEND_FROM_EMAIL is not set — skipping merchant notification email');
+        return;
+      }
+      if (!process.env.RESEND_API_KEY) return;
+
       const { data: storeSettings } = await supabaseAdmin
         .from('store_settings')
         .select('notification_email, store_name')
@@ -212,17 +219,20 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       const notifEmail = storeSettings?.notification_email;
-      if (!notifEmail || !process.env.RESEND_API_KEY) return;
+      if (!notifEmail) return;
 
       const resend = new Resend(process.env.RESEND_API_KEY);
-      const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'noreply@pelyx.co';
       const typeLabel = rType === 'exchange' ? 'Değişim' : 'İade';
 
+      // Escape user-supplied values before embedding in HTML
+      const esc = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
       await resend.emails.send({
-        from: `${storeSettings?.store_name ?? 'ReturnFlow'} <${fromEmail}>`,
+        from: `${esc(storeSettings?.store_name ?? 'ReturnFlow')} <${fromEmail}>`,
         to: [notifEmail],
         subject: `Yeni ${typeLabel} Talebi: ${rf_number}`,
-        html: `<p><strong>${customer_name}</strong> tarafından yeni bir ${typeLabel.toLowerCase()} talebi oluşturuldu.</p><p>Talep No: <strong>${rf_number}</strong></p><p>Sipariş: ${String(order_id)}</p>`,
+        html: `<p><strong>${esc(customer_name)}</strong> tarafından yeni bir ${typeLabel.toLowerCase()} talebi oluşturuldu.</p><p>Talep No: <strong>${esc(rf_number)}</strong></p><p>Sipariş: ${esc(String(order_id))}</p>`,
       });
     } catch { /* noop — notification is best-effort */ }
   })();

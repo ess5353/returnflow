@@ -4,6 +4,7 @@ import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WebhookEvent } from '@/lib/webhooks/events';
 import { createAuditLog, getIp } from '@/lib/audit/log';
+import { validateWebhookUrl } from '@/lib/webhooks/ssrf-guard';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = getAuthContext(request);
@@ -20,10 +21,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   if (body.url) {
-    try {
-      new URL(body.url);
-    } catch {
-      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+    const urlCheck = await validateWebhookUrl(body.url);
+    if (!urlCheck.ok) {
+      return NextResponse.json({ error: urlCheck.error ?? 'Invalid URL' }, { status: 400 });
     }
   }
 
