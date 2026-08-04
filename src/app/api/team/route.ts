@@ -82,9 +82,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 });
   }
 
-  // Create invitation token (expire in 7 days)
+  // Create invitation token (expire in 14 days)
   const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
   // Delete old pending invitations for this member
   await supabaseAdmin.from('team_invitations').delete().eq('member_id', member.id);

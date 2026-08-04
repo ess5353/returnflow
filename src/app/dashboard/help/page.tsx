@@ -6,10 +6,10 @@ import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { cn } from '@/lib/utils';
 import {
-  BarChart2, BookOpen, ChevronDown, ChevronRight, ExternalLink,
+  BarChart2, BookOpen, ChevronDown, ExternalLink,
   FileText, HelpCircle, Key, Mail, MessageCircle, Package,
-  RotateCcw, Settings, ShieldCheck, Sparkles, Users, Webhook,
-  Zap, Bell, ClipboardList, CreditCard,
+  RotateCcw, Search, Settings, ShieldCheck, Sparkles, Users, Webhook,
+  Zap, Bell, ClipboardList, CreditCard, Globe,
 } from 'lucide-react';
 
 // ─── Module definitions ───────────────────────────────────────────────────────
@@ -277,7 +277,7 @@ const MODULES = [
           </table>
         </div>
         <div className="rounded-lg bg-muted/60 p-3 text-xs">
-          <strong>Davet:</strong> E-posta ile davet gönderin. Üye daveti kabul ettiğinde hesabına giriş yapabilir. Davet bağlantısı 7 gün geçerlidir.
+          <strong>Davet:</strong> E-posta ile davet gönderin. Üye daveti kabul ettiğinde hesabına giriş yapabilir. Davet bağlantısı 14 gün geçerlidir.
         </div>
       </div>
     ),
@@ -314,7 +314,7 @@ const MODULES = [
         <h3 className="font-semibold text-sm">Planlar</h3>
         <ul className="list-disc list-inside space-y-1 text-muted-foreground">
           <li><strong>Deneme (14 gün):</strong> Tüm özellikler ücretsiz; süre dolduğunda yeni talep kabulü duraklar.</li>
-          <li><strong>Pro:</strong> Sınırsız talep, tüm özellikler — ikas App Store üzerinden abone olun.</li>
+          <li><strong>Pro (₺12.000/yıl, aylık yaklaşık ₺1.000):</strong> Sınırsız talep, tüm özellikler — ikas App Store üzerinden abone olun.</li>
         </ul>
         <ul className="list-disc list-inside space-y-1 text-muted-foreground">
           <li>Deneme süresi dolduğunda verileriniz silinmez, yalnızca yeni talep alımı durur.</li>
@@ -343,6 +343,58 @@ const MODULES = [
         </ul>
         <div className="rounded-lg bg-muted/60 p-3 text-xs">
           <strong>Gerekli değişkenler:</strong> <code>SECRET_COOKIE_PASSWORD</code>, <code>CLIENT_SECRET</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>CRON_SECRET</code> eksikse uygulama güvenli çalışmaz.
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: 'portal',
+    icon: Globe,
+    label: 'Müşteri Portalı',
+    short: 'Müşterilerin iade/değişim talebi oluşturduğu sayfa',
+    content: (
+      <div className="space-y-4">
+        <p>
+          Müşteri Portalı (<code>/returns</code>), müşterilerinizin sipariş numarası ve e-posta adresiyle giriş yaparak iade veya değişim talebi oluşturduğu sayfadır. Merchant dashboard&apos;a erişim gerektirmez.
+        </p>
+        <h3 className="font-semibold text-sm">Müşteri akışı</h3>
+        <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+          <li>Müşteri sipariş numarasını ve e-posta adresini girer.</li>
+          <li>Sipariş bilgileri ekrana gelir; iade veya değişim seçilir.</li>
+          <li>İade sebebi seçilir, açıklama ve fotoğraf (opsiyonel) eklenir.</li>
+          <li>Talep oluşturulur; müşteriye e-posta bildirimi gönderilir.</li>
+        </ol>
+        <h3 className="font-semibold text-sm">Merchant yapılandırması</h3>
+        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+          <li>Portalın sol panelinde <strong>Ayarlar → İade Politikası</strong> metni görünür.</li>
+          <li>Mağaza adı, logo ve ana renk <strong>Ayarlar</strong> sayfasından yapılandırılır.</li>
+          <li><strong>Çalışma Modu</strong> ile sadece iade, sadece değişim veya her ikisi etkinleştirilebilir.</li>
+          <li>Portal bağlantısını Genel Bakış sayfasından kopyalayıp web sitenize ekleyebilirsiniz.</li>
+        </ul>
+        <div className="rounded-lg bg-muted/60 p-3 text-xs">
+          <strong>İpucu:</strong> Portalı web sitenizdeki &quot;İade / Değişim&quot; butonuna bağlayın. Müşteri deneyimi tamamen özelleştirilebilir.
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: 'track',
+    icon: Search,
+    label: 'Sipariş Takip',
+    short: 'Müşteri talep durumu sorgulama sayfası',
+    content: (
+      <div className="space-y-4">
+        <p>
+          Sipariş Takip sayfası (<code>/track</code>), müşterilerin mevcut iade veya değişim taleplerinin durumunu kontrol edebildiği bağımsız sayfadır.
+        </p>
+        <h3 className="font-semibold text-sm">Nasıl kullanılır?</h3>
+        <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+          <li>Müşteri sipariş numarasını veya RF numarasını girer.</li>
+          <li>E-posta adresi ile doğrulama yapılır.</li>
+          <li>Talebin güncel durumu ekranda gösterilir.</li>
+        </ol>
+        <div className="rounded-lg bg-muted/60 p-3 text-xs">
+          <strong>İpucu:</strong> Talep onay/ret e-postalarına bu sayfanın bağlantısını ekleyin; müşteriler durumu kendinleri takip edebilir.
         </div>
       </div>
     ),

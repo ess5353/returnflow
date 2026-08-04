@@ -251,20 +251,23 @@ export default function DashboardPage() {
         {!loading && <OnboardingChecklist />}
 
         {/* Portal link */}
-        <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
-          <p className="text-xs font-medium text-muted-foreground mb-2">İade Portal Linki</p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{PORTAL_URL}</code>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">İade Portalı</p>
             <Button
               size="sm"
               variant="outline"
-              className="shrink-0 gap-1.5"
+              className="gap-1.5"
               onClick={() => { navigator.clipboard.writeText(PORTAL_URL); toast('Portal linki kopyalandı', 'success'); }}
             >
               <Copy className="h-3.5 w-3.5" />
-              Kopyala
+              Linki Kopyala
             </Button>
           </div>
+          <code className="block w-full truncate rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{PORTAL_URL}</code>
+          <p className="text-xs text-muted-foreground">
+            Bu bağlantıyı web sitenizde <span className="font-medium text-foreground">İade / Değişim</span> butonu olarak kullanabilirsiniz. Müşterileriniz sipariş numaraları ile iade veya değişim talebini buradan oluşturabilir.
+          </p>
         </div>
 
         {/* Main content grid */}

@@ -448,7 +448,7 @@ export default function TeamPage() {
         <div className="flex h-14 items-center justify-between border-b border-border px-6">
           <div className="flex items-center gap-2">
             <h1 className="text-base font-semibold">Takım Yönetimi</h1>
-            <PageHelp title="Takım Yönetimi" content={<p>Ekip üyelerinizi e-posta ile davet edin ve her birine rol atayın. Roller: Sahip (tam yetki), Yönetici, Destek, Depo, Salt Okunur. Davet bağlantısı 7 gün geçerlidir.</p>} />
+            <PageHelp title="Takım Yönetimi" content={<p>Ekip üyelerinizi e-posta ile davet edin ve her birine rol atayın. Roller: Sahip (tam yetki), Yönetici, Destek, Depo, Salt Okunur. Davet bağlantısı 14 gün geçerlidir.</p>} />
           </div>
           {can('team.manage') && (
             <Button size="sm" onClick={() => setInviteOpen(true)} className="gap-2">

@@ -51,7 +51,7 @@ const RELEASES: Release[] = [
       { type: 'feat', text: 'AI Insights — iade sebep analizi' },
       { type: 'feat', text: 'API anahtarları yönetimi' },
       { type: 'feat', text: 'Analiz sayfası ve CSV dışa aktarma' },
-      { type: 'feat', text: '14 günlük ücretsiz deneme + Pro plan (₺10.000/yıl)' },
+      { type: 'feat', text: '14 günlük ücretsiz deneme + Pro plan (₺12.000/yıl)' },
       { type: 'security', text: 'HMAC-SHA256 OAuth callback doğrulama' },
       { type: 'security', text: 'Rate limiting — IP bazlı istek sınırlaması' },
       { type: 'security', text: 'JWT tabanlı session yönetimi' },

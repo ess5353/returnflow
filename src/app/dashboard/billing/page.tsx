@@ -239,9 +239,9 @@ export default function BillingPage() {
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wider text-violet-500">Pro</p>
                       <p className="text-3xl font-extrabold text-violet-900 mt-1">
-                        ₺10.000<span className="text-sm font-normal text-violet-500">/yıl</span>
+                        ₺12.000<span className="text-sm font-normal text-violet-500">/yıl</span>
                       </p>
-                      <p className="text-xs text-violet-600 mt-0.5">≈ ₺833 / ay</p>
+                      <p className="text-xs text-violet-600 mt-0.5">aylık yaklaşık ₺1.000</p>
                     </div>
                     <ul className="space-y-2 text-sm text-violet-800">
                       <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-violet-500" />Sınırsız iade & değişim</li>
