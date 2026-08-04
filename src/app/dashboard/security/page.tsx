@@ -11,6 +11,7 @@ import {
   AlertTriangle, CheckCircle2, ShieldCheck, XCircle, RefreshCw, Lock, Key, Package2, Route,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageHelp } from '@/components/ui/page-help';
 
 type EnvEntry = {
   key: string;
@@ -131,7 +132,10 @@ export default function SecurityPage() {
             <ShieldCheck className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">Güvenlik Denetimi</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold">Güvenlik Denetimi</h1>
+              <PageHelp title="Güvenlik" content={<p>Kritik ortam değişkenleri, HTTPS kullanımı ve güvenlik kontrollerinin özeti. Eksik değişkenler kırmızı işaretlenir. Skoru 100&apos;e yaklaştırmak için eksik yapılandırmaları tamamlayın.</p>} />
+            </div>
             <p className="text-sm text-muted-foreground">Security hardening &amp; production readiness</p>
           </div>
         </div>

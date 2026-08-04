@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
 import { Check, ChevronDown, ChevronUp, Clock, Copy, Plus, Trash2, X, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageHelp } from '@/components/ui/page-help';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -841,7 +842,10 @@ export default function AutomationPage() {
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">Otomasyon Kuralları</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight">Otomasyon Kuralları</h1>
+                  <PageHelp title="Otomasyon Kuralları" content={<p>Koşul tanımlayın (sebep, tutar, ürün adı), eylem seçin (otomatik onayla / reddet). Aktif kurallar, eşleşen her yeni talebe anında uygulanır. Kural günlüğünden hangi kuralın ne zaman devreye girdiğini izleyin.</p>} />
+                </div>
                 <p className="mt-0.5 text-sm text-muted-foreground">
                   Koşullara göre iadeleri otomatik olarak onayla, reddet veya incelemeye gönder.
                 </p>

@@ -9,6 +9,7 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { BarChart2, CheckCircle2, CircleDollarSign, Minus, Package, Tag, TrendingDown, TrendingUp } from 'lucide-react';
+import { PageHelp } from '@/components/ui/page-help';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -380,7 +381,10 @@ export default function AnalyticsPage() {
         {/* Header + date range filters */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Analiz</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">Analiz</h1>
+              <PageHelp title="Analiz" content={<p>İade ve değişim verilerinizin grafik ve tablolarla özeti. Tarih aralığı filtresi ile dönem seçin, sağ üstteki &quot;Dışa Aktar&quot; butonu ile CSV indirin. İade oranı, sebep dağılımı ve trend grafikleri sayfa yenilendiğinde otomatik güncellenir.</p>} />
+            </div>
             <p className="mt-0.5 text-sm text-muted-foreground">İade ve değişim verilerinden otomatik oluşturulan istatistikler.</p>
 
             {/* Analytics type tab */}

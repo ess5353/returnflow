@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
 import { Upload } from 'lucide-react';
+import { PageHelp } from '@/components/ui/page-help';
 
 export default function SettingsPage() {
   const { authHeader: token } = useAuth();
@@ -119,7 +120,10 @@ export default function SettingsPage() {
   return (
     <DashboardShell storeName={storeName || undefined} logoUrl={logoUrl || undefined}>
       <div className="p-6 md:p-8 max-w-2xl">
-        <h1 className="text-2xl font-bold tracking-tight">Ayarlar</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">Ayarlar</h1>
+          <PageHelp title="Ayarlar" content={<p>Mağaza adı, logo, renk teması ve iade politikası müşteri portalında görünür. Çalışma Modu ile portalda iade ve/veya değişim seçeneğini kontrol edin. Değişiklikleri kaydetmek için &quot;Ayarları Kaydet&quot; butonuna tıklayın.</p>} />
+        </div>
         <p className="mt-0.5 text-sm text-muted-foreground">Mağaza bilgileri ve iade politikasını buradan yönetin.</p>
 
         {loading ? (

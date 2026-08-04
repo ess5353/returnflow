@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, CheckCircle2, CreditCard, ExternalLink, Mail, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Entitlement, Plan } from '@/lib/billing/entitlement';
+import { PageHelp } from '@/components/ui/page-help';
 
 const PLAN_LABELS: Record<Plan, string> = {
   trial:      'Deneme Süresi',
@@ -131,7 +132,10 @@ export default function BillingPage() {
             <CreditCard className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">Fatura & Plan</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold">Fatura & Plan</h1>
+              <PageHelp title="Fatura & Plan" content={<p>Deneme süresi (14 gün) ve Pro plan bilgileri. Deneme bittiğinde verileriniz silinmez; yalnızca yeni talep kabulü durur. Pro abonelik ikas App Store üzerinden yönetilir.</p>} />
+            </div>
             <p className="text-sm text-muted-foreground">Abonelik durumunuzu yönetin</p>
           </div>
           <Button

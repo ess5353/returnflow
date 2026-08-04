@@ -265,6 +265,24 @@ export default function ReturnsPage() {
             {/* ── Right panel ────────────────────────────────────────────── */}
             <div className="p-4 sm:p-7 md:p-10">
 
+              {/* Mobile-only branding header — shows store info when left panel is hidden */}
+              <div className="lg:hidden mb-6 pb-5 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  {settings?.logo_url && (
+                    <img src={settings.logo_url} alt="Logo" className="h-9 w-9 rounded-lg object-contain border border-gray-200 bg-white" />
+                  )}
+                  <div>
+                    <div className="text-[10px] font-bold tracking-[0.25em] text-gray-400 uppercase">Müşteri Hizmetleri</div>
+                    <div className="text-sm font-bold leading-tight text-gray-800">{brandName}</div>
+                  </div>
+                  {settings?.support_email && (
+                    <a href={`mailto:${settings.support_email}`} className="ml-auto text-xs text-gray-400 hover:text-gray-600 truncate max-w-[140px]">
+                      {settings.support_email}
+                    </a>
+                  )}
+                </div>
+              </div>
+
               {/* STEP: Search */}
               {step === 'search' && (
                 <>

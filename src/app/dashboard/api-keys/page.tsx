@@ -13,6 +13,7 @@ import {
   Key, Plus, ShieldOff, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageHelp } from '@/components/ui/page-help';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -338,7 +339,10 @@ export default function ApiKeysPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold">API Anahtarları</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">API Anahtarları</h1>
+              <PageHelp title="API Anahtarları" content={<p>Kendi kodunuzdan veya araçlardan ReturnFlow verilerine erişmek için anahtar oluşturun. Anahtar yalnızca oluşturulduğu an görünür — güvenli bir yere kaydedin. Kullanılmayan anahtarları silin.</p>} />
+            </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Public API erişimi için anahtarlar oluşturun ve yönetin.
             </p>

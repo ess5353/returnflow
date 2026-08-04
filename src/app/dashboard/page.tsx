@@ -15,6 +15,7 @@ import { toast } from '@/components/ui/toast';
 import { Check, ChevronRight, Copy, FlaskConical, RefreshCw, Trash2, X } from 'lucide-react';
 import { OnboardingWizard } from '@/components/onboarding/wizard';
 import { OnboardingChecklist } from '@/components/onboarding/checklist';
+import { PageHelp } from '@/components/ui/page-help';
 
 type ReturnRequest = {
   id: string;
@@ -203,7 +204,10 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Genel Bakış</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">Genel Bakış</h1>
+              <PageHelp title="Genel Bakış" content={<p>Müşterilerden gelen iade taleplerinin özeti. Sol listeden bir talep seçin, sağda detayları görün. Onayla veya Reddet butonuyla talebi sonuçlandırın. Durum ve tarih filtresi ile belirli taleplere odaklanın.</p>} />
+            </div>
             <p className="mt-0.5 text-sm text-muted-foreground">Müşterilerden gelen iade taleplerini buradan yönetin.</p>
           </div>
           <Button

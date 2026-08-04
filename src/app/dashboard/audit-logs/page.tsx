@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { PageHelp } from '@/components/ui/page-help';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type AuditAction =
@@ -118,9 +119,9 @@ function AuditRow({ log }: { log: AuditLog }) {
           </span>
         </td>
         <td className="px-4 py-3 text-sm text-foreground">{log.user_label}</td>
-        <td className="px-4 py-3 text-xs text-muted-foreground">{ENTITY_LABELS[log.entity_type] ?? log.entity_type}</td>
-        <td className="px-4 py-3 text-xs text-muted-foreground font-mono truncate max-w-[160px]">{log.entity_id ?? '—'}</td>
-        <td className="px-4 py-3 text-xs text-muted-foreground">{log.ip_address ?? '—'}</td>
+        <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{ENTITY_LABELS[log.entity_type] ?? log.entity_type}</td>
+        <td className="px-4 py-3 text-xs text-muted-foreground font-mono truncate max-w-[160px] hidden lg:table-cell">{log.entity_id ?? '—'}</td>
+        <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{log.ip_address ?? '—'}</td>
         <td className="px-4 py-3 text-muted-foreground">
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </td>
@@ -194,7 +195,10 @@ export default function AuditLogsPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 items-center justify-between border-b border-border px-6">
-        <h1 className="text-base font-semibold">Denetim Günlüğü</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-base font-semibold">Denetim Günlüğü</h1>
+          <PageHelp title="Denetim Günlüğü" content={<p>Sistemdeki tüm önemli işlemlerin zaman damgalı kaydı. Kim hangi talebi onayladı, hangi ayarı değiştirdi — değiştirilemez log. İşlem türüne göre filtreleyin.</p>} />
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -283,15 +287,16 @@ export default function AuditLogsPage() {
         ) : logs.length === 0 ? (
           <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Kayıt bulunamadı.</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-muted/60 backdrop-blur">
               <tr>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Tarih</th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Aksiyon</th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Kullanıcı</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Varlık Tipi</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Varlık ID</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">IP</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground hidden md:table-cell">Varlık Tipi</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">Varlık ID</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground hidden md:table-cell">IP</th>
                 <th className="px-4 py-2.5 w-8" />
               </tr>
             </thead>
@@ -299,6 +304,7 @@ export default function AuditLogsPage() {
               {logs.map((log) => <AuditRow key={log.id} log={log} />)}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

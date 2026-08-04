@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ExportModal } from '@/components/returns/export-modal';
+import { PageHelp } from '@/components/ui/page-help';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -753,7 +754,10 @@ export default function ReturnsManagementPage() {
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">İade & Değişim Yönetimi</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight">İade & Değişim Yönetimi</h1>
+                  <PageHelp title="İade Yönetimi" content={<p>Tüm talepleri filtreleyin, arayın, sıralayın. Talebi tıklayın → sağ panelde detaylar açılır → durum güncelleyin, not ekleyin. CSV dışa aktarımı için sağ üstteki Dışa Aktar butonunu kullanın.</p>} />
+                </div>
                 <p className="mt-0.5 text-sm text-muted-foreground">Tüm iade ve değişim taleplerini görüntüleyin, filtreleyin ve yönetin.</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

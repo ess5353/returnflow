@@ -19,6 +19,7 @@ import {
   renderTemplate,
   type TemplateType,
 } from '@/lib/email/templates';
+import { PageHelp } from '@/components/ui/page-help';
 
 const TEMPLATE_TYPES: TemplateType[] = [
   'return_approved',
@@ -198,7 +199,10 @@ export default function EmailTemplatesPage() {
               {/* Header */}
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold">{TEMPLATE_META[selected].label}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{TEMPLATE_META[selected].label}</h2>
+                    <PageHelp title="E-posta Şablonları" content={<p>Müşterilere gönderilen otomatik e-postaların içeriğini düzenleyin. {"{{customer_name}}"}, {"{{order_number}}"} gibi değişkenler kullanabilirsiniz. &quot;Test Et&quot; ile gerçek bir test e-postası gönderin. RESEND_API_KEY ve RESEND_FROM_EMAIL tanımlı olmalıdır.</p>} />
+                  </div>
                   <p className="text-sm text-muted-foreground">{TEMPLATE_META[selected].description}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

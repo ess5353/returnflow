@@ -5,6 +5,7 @@ import { AppBridgeHelper } from '@ikas/app-helpers';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { cn } from '@/lib/utils';
 import { BookOpen, ChevronRight, Copy, Check } from 'lucide-react';
+import { PageHelp } from '@/components/ui/page-help';
 
 // ─── Code Block ───────────────────────────────────────────────────────────────
 
@@ -130,7 +131,10 @@ export default function ApiDocsPage() {
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl space-y-12 p-6 pb-24">
             <div>
-              <h1 className="text-2xl font-bold">Pelyx Public API</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold">Pelyx Public API</h1>
+                <PageHelp title="API Belgeleri" content={<p>ReturnFlow Public API referansı. Önce API Anahtarları sayfasından bir anahtar oluşturun, sonra isteklerde X-API-Key başlığını kullanın. &quot;Dene&quot; butonu ile endpoint&apos;leri doğrudan test edebilirsiniz.</p>} />
+              </div>
               <p className="mt-2 text-muted-foreground">
                 İade ve değişim verilerinize programatik erişim için REST API.
               </p>

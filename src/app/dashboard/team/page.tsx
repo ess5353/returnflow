@@ -13,6 +13,7 @@ import { ALL_PERMISSIONS, ROLE_LABELS, ROLE_PERMISSIONS, ROLES, getEffectivePerm
 import { Check, Copy, Link2, Loader2, MoreVertical, Plus, RefreshCw, Trash2, UserCheck, UserX, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as Dialog from '@radix-ui/react-dialog';
+import { PageHelp } from '@/components/ui/page-help';
 
 type MemberStatus = 'invited' | 'active' | 'disabled';
 
@@ -334,7 +335,7 @@ function MemberRow({
             ))}
           </select>
         </td>
-        <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(member.created_at).toLocaleDateString('tr-TR')}</td>
+        <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell">{new Date(member.created_at).toLocaleDateString('tr-TR')}</td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-1.5 justify-end">
             <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPermOpen(true)}>
@@ -445,7 +446,10 @@ export default function TeamPage() {
     <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
       <div className="flex h-full flex-col">
         <div className="flex h-14 items-center justify-between border-b border-border px-6">
-          <h1 className="text-base font-semibold">Takım Yönetimi</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-semibold">Takım Yönetimi</h1>
+            <PageHelp title="Takım Yönetimi" content={<p>Ekip üyelerinizi e-posta ile davet edin ve her birine rol atayın. Roller: Sahip (tam yetki), Yönetici, Destek, Depo, Salt Okunur. Davet bağlantısı 7 gün geçerlidir.</p>} />
+          </div>
           {can('team.manage') && (
             <Button size="sm" onClick={() => setInviteOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -484,13 +488,14 @@ export default function TeamPage() {
                 Henüz takım üyesi yok. Üye davet edin.
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted/60 backdrop-blur">
                   <tr>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Üye</th>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Durum</th>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Rol</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Eklenme</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">Eklenme</th>
                     <th className="px-4 py-2.5 w-32" />
                   </tr>
                 </thead>
@@ -506,6 +511,7 @@ export default function TeamPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}

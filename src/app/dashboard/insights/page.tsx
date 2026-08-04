@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Insight, InsightsPayload, InsightSection, InsightSeverity, MerchantStats } from '@/lib/insights/types';
+import { PageHelp } from '@/components/ui/page-help';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -372,6 +373,7 @@ export default function InsightsPage() {
                 <div className="flex items-center gap-2">
                   <Brain className="h-5 w-5 text-primary" />
                   <h1 className="text-lg font-semibold">AI Insights</h1>
+                  <PageHelp title="AI Insights" content={<p>Yapay zeka ile iade verilerinizi analiz eder: en sık iade edilen ürünler, ortak nedenler ve dönemsel anomaliler. OpenAI API anahtarı tanımlıysa AI destekli, değilse istatistiksel analiz çalışır.</p>} />
                   {payload?.aiPowered && (
                     <span className="flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
                       <Sparkles className="h-3 w-3" />

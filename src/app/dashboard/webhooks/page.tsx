@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { WEBHOOK_EVENTS, WEBHOOK_EVENT_LABELS } from '@/lib/webhooks/events';
 import type { WebhookEvent } from '@/lib/webhooks/events';
+import { PageHelp } from '@/components/ui/page-help';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -587,7 +588,10 @@ export default function WebhooksPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold">Webhook &amp; Entegrasyonlar</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">Webhook &amp; Entegrasyonlar</h1>
+              <PageHelp title="Webhooks" content={<p>Belirli olaylar gerçekleştiğinde kendi URL&apos;nize otomatik HTTP POST gönderir. Zapier, Make.com veya kendi sisteminizle entegrasyon için idealdir. HTTPS zorunludur. &quot;Test Et&quot; butonu ile bağlantıyı doğrulayın.</p>} />
+            </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Olayları harici sistemlere HTTP POST olarak iletin.
             </p>

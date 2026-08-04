@@ -13,6 +13,7 @@ import { Bell, CheckCheck, ChevronLeft, ChevronRight, Trash2 } from 'lucide-reac
 import { NOTIFICATION_CONFIG, NOTIFICATION_TYPE_OPTIONS, timeAgo } from '@/lib/notifications/config';
 import type { NotificationType } from '@/lib/notifications/create';
 import { cn } from '@/lib/utils';
+import { PageHelp } from '@/components/ui/page-help';
 
 const PAGE_SIZE = 20;
 
@@ -102,7 +103,10 @@ export default function NotificationsPage() {
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Bildirimler</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">Bildirimler</h1>
+              <PageHelp title="Bildirimler" content={<p>Sistem bildirimleri burada görünür. Yeni talep, durum değişikliği gibi olaylarda bildirim alın. &quot;Tümünü Okundu İşaretle&quot; butonu ile toplu temizleme yapabilirsiniz. E-posta bildirimleri için Ayarlar sayfasından bildirim e-postası tanımlayın.</p>} />
+            </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {unread > 0 ? `${unread} okunmamış bildirim` : 'Tüm bildirimler okundu'}
             </p>
