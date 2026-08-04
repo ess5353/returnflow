@@ -120,8 +120,8 @@ export default function ChangelogPage() {
 
         <p className="text-center text-xs text-muted-foreground">
           Yeni özellik veya hata bildirimi için{' '}
-          <a href="mailto:hello@pelyx.co" className="text-primary hover:underline">
-            hello@pelyx.co
+          <a href="mailto:eypsrkc@gmail.com" className="text-primary hover:underline">
+            eypsrkc@gmail.com
           </a>{' '}
           adresine yazın.
         </p>

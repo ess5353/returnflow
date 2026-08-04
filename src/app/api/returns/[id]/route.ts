@@ -7,7 +7,7 @@ import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import type { WebhookEvent } from '@/lib/webhooks/events';
 import { createAuditLog, getIp, type AuditAction } from '@/lib/audit/log';
 
-const NOTIFIABLE_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Tamamlandı']);
+const NOTIFIABLE_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Kargo Bekleniyor', 'Kargo Alındı', 'İade Edildi', 'Tamamlandı']);
 
 // ── PATCH: update status and/or admin_note ─────────────────────────────────
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -80,7 +80,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           title = isExchange ? `Değişim Onaylandı: ${data.rf_number}` : `İade Onaylandı: ${data.rf_number}`;
         } else if (newStatus === 'Reddedildi') {
           type = 'return_rejected';
-          title = `İade Reddedildi: ${data.rf_number}`;
+          title = `Reddedildi: ${data.rf_number}`;
+        } else if (newStatus === 'Kargo Bekleniyor') {
+          type = isExchange ? 'exchange_approved' : 'return_approved';
+          title = `Kargo Bekleniyor: ${data.rf_number}`;
+        } else if (newStatus === 'Kargo Alındı') {
+          type = isExchange ? 'exchange_approved' : 'return_approved';
+          title = `Kargo Alındı: ${data.rf_number}`;
+        } else if (newStatus === 'İade Edildi') {
+          type = 'refund_completed';
+          title = `İade İşlendi: ${data.rf_number}`;
         } else {
           type = isExchange ? 'exchange_completed' : 'refund_completed';
           title = isExchange ? `Değişim Tamamlandı: ${data.rf_number}` : `İade Tamamlandı: ${data.rf_number}`;
@@ -112,9 +121,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
         // Audit log
         const auditActionMap: Record<string, AuditAction> = {
-          Onaylandı: isExchange ? 'exchange.approved' : 'return.approved',
-          Reddedildi: 'return.rejected',
-          Tamamlandı: isExchange ? 'exchange.completed' : 'return.completed',
+          'Onaylandı': isExchange ? 'exchange.approved' : 'return.approved',
+          'Reddedildi': 'return.rejected',
+          'Kargo Bekleniyor': isExchange ? 'exchange.shipment_awaited' : 'return.shipment_awaited',
+          'Kargo Alındı': isExchange ? 'exchange.shipment_received' : 'return.shipment_received',
+          'İade Edildi': 'return.refunded',
+          'Tamamlandı': isExchange ? 'exchange.completed' : 'return.completed',
         };
         const auditAction = auditActionMap[newStatus];
         if (auditAction) {

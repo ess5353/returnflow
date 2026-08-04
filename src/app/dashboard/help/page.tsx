@@ -497,9 +497,9 @@ export default function HelpPage() {
         {/* Quick links */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            { icon: MessageCircle, label: 'Destek E-postası', desc: '< 24 saat yanıt', href: 'mailto:hello@pelyx.co?subject=ReturnFlow Destek' },
-            { icon: FileText, label: 'Özellik Talebi', desc: 'Geri bildirim gönderin', href: 'mailto:hello@pelyx.co?subject=Özellik Talebi' },
-            { icon: Zap, label: 'Hata Bildirimi', desc: 'Sorun mu var?', href: 'mailto:hello@pelyx.co?subject=Hata Bildirimi' },
+            { icon: MessageCircle, label: 'Destek E-postası', desc: '< 24 saat yanıt', href: 'mailto:eypsrkc@gmail.com?subject=ReturnFlow Destek' },
+            { icon: FileText, label: 'Özellik Talebi', desc: 'Geri bildirim gönderin', href: 'mailto:eypsrkc@gmail.com?subject=Özellik Talebi' },
+            { icon: Zap, label: 'Hata Bildirimi', desc: 'Sorun mu var?', href: 'mailto:eypsrkc@gmail.com?subject=Hata Bildirimi' },
           ].map(({ icon: Icon, label, desc, href }) => (
             <a
               key={label}
@@ -573,7 +573,7 @@ export default function HelpPage() {
             <p className="text-xs text-muted-foreground mt-0.5">E-posta gönderin — 24 saat içinde yanıt alın.</p>
           </div>
           <a
-            href="mailto:hello@pelyx.co?subject=ReturnFlow Destek"
+            href="mailto:eypsrkc@gmail.com?subject=ReturnFlow Destek"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"

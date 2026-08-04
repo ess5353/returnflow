@@ -272,7 +272,7 @@ export default function BillingPage() {
                     <Button
                       variant="outline"
                       className="w-full gap-2"
-                      onClick={() => window.open('mailto:hello@pelyx.co?subject=Enterprise Plan', '_blank')}
+                      onClick={() => window.open('mailto:eypsrkc@gmail.com?subject=Enterprise Plan', '_blank')}
                     >
                       <Mail className="h-4 w-4" />
                       Satışla İletişime Geç

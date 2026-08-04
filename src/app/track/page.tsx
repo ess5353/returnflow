@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { PublicStoreSettings } from '@/app/api/store-settings/route';
-import { ArrowLeftRight, Check, Clock, ExternalLink, Hash, Truck, X } from 'lucide-react';
+import { ArrowLeftRight, Check, Clock, ExternalLink, Hash, Package, Truck, X } from 'lucide-react';
 import { getCarrierLabel, getShippingStatusLabel, getTrackingUrl } from '@/lib/shipping/carriers';
 
 type ReturnRequest = {
@@ -36,12 +36,15 @@ const EXCHANGE_TYPE_LABELS: Record<string, string> = {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    'Onaylandı': { label: 'Onaylandı', cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
-    'Reddedildi': { label: 'Reddedildi', cls: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
-    'Yeni Talep': { label: 'İncelemede', cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
-    'İncelemede': { label: 'İncelemede', cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
-    'Kargoya Verildi': { label: 'Kargoya Verildi', cls: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
-    'Tamamlandı': { label: 'Tamamlandı', cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+    'Yeni Talep':       { label: 'İncelemede',       cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+    'İncelemede':       { label: 'İncelemede',       cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+    'Onaylandı':        { label: 'Onaylandı',        cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+    'Kargo Bekleniyor': { label: 'Kargo Bekleniyor', cls: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+    'Kargo Alındı':     { label: 'Kargo Alındı',     cls: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+    'İade Edildi':      { label: 'İade İşlendi',     cls: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200' },
+    'Kargoya Verildi':  { label: 'Kargoya Verildi',  cls: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+    'Tamamlandı':       { label: 'Tamamlandı',       cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+    'Reddedildi':       { label: 'Reddedildi',       cls: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
   };
   const config = map[status] ?? { label: status, cls: 'bg-gray-50 text-gray-600 ring-1 ring-gray-200' };
   return <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${config.cls}`}>{config.label}</span>;
@@ -89,27 +92,31 @@ export default function TrackPage() {
   const accentColor = settings?.primary_color || '#000000';
 
   const isExchange = request?.request_type === 'exchange';
-  const isShipped = request?.status === 'Kargoya Verildi';
-  const isCompleted = request?.status === 'Tamamlandı';
 
-  const timelineSteps = [
-    { label: 'Talep Oluşturuldu', done: true, icon: Check },
-    { label: 'İnceleme Süreci', done: request ? request.status !== 'Yeni Talep' : false, icon: Clock },
-    {
-      label: request?.status === 'Onaylandı' ? (isExchange ? 'Değişim Onaylandı' : 'İade Onaylandı')
-        : request?.status === 'Reddedildi' ? (isExchange ? 'Değişim Reddedildi' : 'İade Reddedildi')
-        : 'Karar Bekleniyor',
-      done: request ? ['Onaylandı', 'Reddedildi', 'Kargoya Verildi', 'Tamamlandı'].includes(request.status) : false,
-      rejected: request?.status === 'Reddedildi',
-      icon: request?.status === 'Reddedildi' ? X : Check,
-    },
-    ...(isExchange ? [{
-      label: isCompleted ? 'Tamamlandı' : isShipped ? 'Kargoya Verildi' : 'Ürün Gönderimi Bekleniyor',
-      done: isShipped || isCompleted,
-      rejected: false,
-      icon: Check,
-    }] : []),
-  ];
+  const STATUS_ORDER_RETURN = ['Yeni Talep', 'İncelemede', 'Onaylandı', 'Kargo Bekleniyor', 'Kargo Alındı', 'İade Edildi', 'Tamamlandı'];
+  const STATUS_ORDER_EXCHANGE = ['Yeni Talep', 'İncelemede', 'Onaylandı', 'Kargo Bekleniyor', 'Kargo Alındı', 'Kargoya Verildi', 'Tamamlandı'];
+  const statusOrder = isExchange ? STATUS_ORDER_EXCHANGE : STATUS_ORDER_RETURN;
+  const currentIdx = request ? statusOrder.indexOf(request.status) : -1;
+  const isRejected = request?.status === 'Reddedildi';
+
+  const timelineSteps = isRejected
+    ? [
+        { label: 'Talep Oluşturuldu', done: true, rejected: false, icon: Check },
+        { label: 'İnceleme Süreci', done: true, rejected: false, icon: Clock },
+        { label: isExchange ? 'Değişim Reddedildi' : 'İade Reddedildi', done: true, rejected: true, icon: X },
+      ]
+    : [
+        { label: 'Talep Oluşturuldu', done: true, rejected: false, icon: Check },
+        { label: 'İnceleme Süreci', done: currentIdx >= 1, rejected: false, icon: Clock },
+        { label: isExchange ? 'Değişim Onaylandı' : 'İade Onaylandı', done: currentIdx >= 2, rejected: false, icon: Check },
+        { label: 'Müşteri Kargo Gönderiyor', done: currentIdx >= 3, rejected: false, icon: Truck },
+        { label: 'Kargo Teslim Alındı', done: currentIdx >= 4, rejected: false, icon: Package },
+        ...(isExchange
+          ? [{ label: 'Yeni Ürün Kargoya Verildi', done: currentIdx >= 5, rejected: false, icon: Check }]
+          : [{ label: 'Para İadesi İşlendi', done: currentIdx >= 5, rejected: false, icon: Check }]
+        ),
+        { label: 'Süreç Tamamlandı', done: currentIdx >= 6, rejected: false, icon: Check },
+      ];
 
   return (
     <main className="min-h-screen bg-[#f5f6fa] px-4 py-8 md:p-10">

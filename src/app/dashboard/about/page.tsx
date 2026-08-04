@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
-import { ArrowLeftRight, ExternalLink, Github, Globe, Mail, Shield, Zap } from 'lucide-react';
+import { ArrowLeftRight, Mail, Shield, Zap, Globe } from 'lucide-react';
 
 const VERSION = '0.1.0';
 const BUILD_DATE = new Date().getFullYear();
@@ -94,23 +94,13 @@ export default function AboutPage() {
         {/* Links */}
         <div className="flex flex-wrap gap-3">
           <a
-            href="mailto:hello@pelyx.co"
+            href="mailto:eypsrkc@gmail.com"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
           >
             <Mail className="h-4 w-4 text-muted-foreground" />
-            hello@pelyx.co
-          </a>
-          <a
-            href="https://pelyx.co"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
-          >
-            <Globe className="h-4 w-4 text-muted-foreground" />
-            pelyx.co
-            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+            eypsrkc@gmail.com
           </a>
         </div>
 

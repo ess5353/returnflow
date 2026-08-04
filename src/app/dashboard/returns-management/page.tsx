@@ -102,8 +102,8 @@ type TypeTab = 'return' | 'exchange';
 
 const PAGE_SIZE = 20;
 
-const RETURN_STATUS_OPTIONS = ['Tümü', 'Yeni Talep', 'İncelemede', 'Onaylandı', 'Reddedildi'] as const;
-const EXCHANGE_STATUS_OPTIONS = ['Tümü', 'Yeni Talep', 'İncelemede', 'Onaylandı', 'Reddedildi', 'Kargoya Verildi', 'Tamamlandı'] as const;
+const RETURN_STATUS_OPTIONS = ['Tümü', 'Yeni Talep', 'İncelemede', 'Onaylandı', 'Kargo Bekleniyor', 'Kargo Alındı', 'İade Edildi', 'Tamamlandı', 'Reddedildi'] as const;
+const EXCHANGE_STATUS_OPTIONS = ['Tümü', 'Yeni Talep', 'İncelemede', 'Onaylandı', 'Kargo Bekleniyor', 'Kargo Alındı', 'Kargoya Verildi', 'Tamamlandı', 'Reddedildi'] as const;
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'newest', label: 'En Yeni' },
@@ -123,10 +123,10 @@ const DATE_OPTIONS: { value: DateFilter; label: string }[] = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function statusVariant(status: string): 'pending' | 'approved' | 'rejected' | 'secondary' | 'shipped' {
-  if (status === 'Onaylandı' || status === 'Tamamlandı') return 'approved';
+  if (status === 'Onaylandı' || status === 'Tamamlandı' || status === 'İade Edildi') return 'approved';
   if (status === 'Reddedildi') return 'rejected';
   if (status === 'Yeni Talep' || status === 'İncelemede') return 'pending';
-  if (status === 'Kargoya Verildi') return 'shipped';
+  if (status === 'Kargoya Verildi' || status === 'Kargo Bekleniyor' || status === 'Kargo Alındı') return 'shipped';
   return 'secondary';
 }
 
@@ -296,9 +296,14 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   'return.created': 'İade oluşturuldu',
   'return.approved': 'İade onaylandı',
   'return.rejected': 'İade reddedildi',
+  'return.shipment_awaited': 'Kargo bekleniyor',
+  'return.shipment_received': 'Kargo alındı',
+  'return.refunded': 'İade işlendi',
   'return.completed': 'İade tamamlandı',
   'exchange.created': 'Değişim oluşturuldu',
   'exchange.approved': 'Değişim onaylandı',
+  'exchange.shipment_awaited': 'Kargo bekleniyor',
+  'exchange.shipment_received': 'Kargo alındı',
   'exchange.completed': 'Değişim tamamlandı',
 };
 
@@ -642,6 +647,10 @@ export default function ReturnsManagementPage() {
     const label = status === 'Onaylandı' ? 'Talep onaylandı — müşteriye e-posta gönderildi'
       : status === 'Reddedildi' ? 'Talep reddedildi — müşteri bilgilendirildi'
       : status === 'Tamamlandı' ? 'Tamamlandı — müşteriye e-posta gönderildi'
+      : status === 'Kargo Bekleniyor' ? 'Durum güncellendi: Kargo bekleniyor'
+      : status === 'Kargo Alındı' ? 'Kargo teslim alındı olarak işaretlendi'
+      : status === 'İade Edildi' ? 'İade işlendi olarak işaretlendi'
+      : status === 'İncelemede' ? 'Talep incelemeye alındı'
       : 'Durum güncellendi';
     toast(label, 'success');
   };
@@ -1255,51 +1264,114 @@ export default function ReturnsManagementPage() {
                   </Button>
                 </div>
 
-                {/* Status actions */}
+                {/* Status actions — full lifecycle */}
                 {(can('returns.approve') || can('returns.reject') || can('returns.complete')) && (
-                <div className="space-y-2 pt-2 border-t border-border">
-                  {can('returns.approve') && (
+                <div className="space-y-2 pt-3 border-t border-border">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Durum Güncelle</p>
+
+                  {/* Review stage */}
+                  {can('returns.approve') && drawerRow.status === 'Yeni Talep' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 border-amber-200 text-amber-600 hover:bg-amber-50"
+                      onClick={() => updateStatus(drawerRow.id, 'İncelemede')}
+                      disabled={updatingStatus}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      İncelemeye Al
+                    </Button>
+                  )}
+
+                  {/* Approve */}
+                  {can('returns.approve') && !['Onaylandı', 'Kargo Bekleniyor', 'Kargo Alındı', 'İade Edildi', 'Kargoya Verildi', 'Tamamlandı'].includes(drawerRow.status) && (
                   <Button
                     size="sm"
                     className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                     onClick={() => updateStatus(drawerRow.id, 'Onaylandı')}
-                    disabled={updatingStatus || drawerRow.status === 'Onaylandı'}
+                    disabled={updatingStatus}
                   >
                     <Check className="h-3.5 w-3.5" />
                     Onayla
                   </Button>
                   )}
-                  {drawerRow.request_type === 'exchange' && can('returns.complete') && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                        onClick={() => updateStatus(drawerRow.id, 'Kargoya Verildi')}
-                        disabled={updatingStatus || drawerRow.status === 'Kargoya Verildi'}
-                      >
-                        <Package className="h-3.5 w-3.5" />
-                        Kargoya Verildi
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-                        onClick={() => updateStatus(drawerRow.id, 'Tamamlandı')}
-                        disabled={updatingStatus || drawerRow.status === 'Tamamlandı'}
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        Tamamlandı
-                      </Button>
-                    </>
+
+                  {/* Post-approval lifecycle */}
+                  {can('returns.complete') && drawerRow.status === 'Onaylandı' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+                      onClick={() => updateStatus(drawerRow.id, 'Kargo Bekleniyor')}
+                      disabled={updatingStatus}
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      Kargo Bekleniyor
+                    </Button>
                   )}
-                  {can('returns.reject') && (
+
+                  {can('returns.complete') && drawerRow.status === 'Kargo Bekleniyor' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+                      onClick={() => updateStatus(drawerRow.id, 'Kargo Alındı')}
+                      disabled={updatingStatus}
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      Kargo Alındı
+                    </Button>
+                  )}
+
+                  {/* Return-only: refund step */}
+                  {can('returns.complete') && drawerRow.request_type !== 'exchange' && drawerRow.status === 'Kargo Alındı' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 border-violet-200 text-violet-600 hover:bg-violet-50"
+                      onClick={() => updateStatus(drawerRow.id, 'İade Edildi')}
+                      disabled={updatingStatus}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      İade İşlendi
+                    </Button>
+                  )}
+
+                  {/* Exchange-only: dispatch replacement */}
+                  {can('returns.complete') && drawerRow.request_type === 'exchange' && drawerRow.status === 'Kargo Alındı' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+                      onClick={() => updateStatus(drawerRow.id, 'Kargoya Verildi')}
+                      disabled={updatingStatus}
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      Yeni Ürün Kargoya Verildi
+                    </Button>
+                  )}
+
+                  {/* Complete */}
+                  {can('returns.complete') && (drawerRow.status === 'İade Edildi' || drawerRow.status === 'Kargoya Verildi') && (
+                    <Button
+                      size="sm"
+                      className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => updateStatus(drawerRow.id, 'Tamamlandı')}
+                      disabled={updatingStatus}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Tamamlandı olarak kapat
+                    </Button>
+                  )}
+
+                  {/* Reject — always available unless already done */}
+                  {can('returns.reject') && !['Tamamlandı', 'Reddedildi'].includes(drawerRow.status) && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="w-full gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                     onClick={() => updateStatus(drawerRow.id, 'Reddedildi')}
-                    disabled={updatingStatus || drawerRow.status === 'Reddedildi'}
+                    disabled={updatingStatus}
                   >
                     <X className="h-3.5 w-3.5" />
                     Reddet

@@ -43,10 +43,11 @@ type IkasOrder = {
   items: { name: string; sku?: string; quantity: number; price: number }[];
 };
 
-function statusVariant(status: string): 'pending' | 'approved' | 'rejected' | 'secondary' {
-  if (status === 'Onaylandı') return 'approved';
+function statusVariant(status: string): 'pending' | 'approved' | 'rejected' | 'secondary' | 'shipped' {
+  if (status === 'Onaylandı' || status === 'Tamamlandı' || status === 'İade Edildi') return 'approved';
   if (status === 'Reddedildi') return 'rejected';
-  if (status === 'Yeni Talep') return 'pending';
+  if (status === 'Yeni Talep' || status === 'İncelemede') return 'pending';
+  if (status === 'Kargo Bekleniyor' || status === 'Kargo Alındı' || status === 'Kargoya Verildi') return 'shipped';
   return 'secondary';
 }
 

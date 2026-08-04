@@ -3,7 +3,9 @@ import type { NextRequest } from 'next/server';
 
 export type AuditAction =
   | 'return.created' | 'return.approved' | 'return.rejected' | 'return.completed'
+  | 'return.shipment_awaited' | 'return.shipment_received' | 'return.refunded'
   | 'exchange.created' | 'exchange.approved' | 'exchange.completed'
+  | 'exchange.shipment_awaited' | 'exchange.shipment_received'
   | 'automation_rule.created' | 'automation_rule.updated' | 'automation_rule.deleted'
   | 'webhook.created' | 'webhook.updated' | 'webhook.deleted'
   | 'api_key.created' | 'api_key.revoked'
