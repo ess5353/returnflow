@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
+import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -295,6 +296,7 @@ function StatCard({ label, value, sub, icon: Icon }: { label: string; value: str
 
 export default function InsightsPage() {
   const { authHeader: token } = useAuth();
+  const { settings, loadSettings } = useStoreSettings();
   const [payload, setPayload] = useState<InsightsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -319,7 +321,7 @@ export default function InsightsPage() {
     else setLoading(false);
   }, [fetchInsights]);
 
-  useEffect(() => { AppBridgeHelper.closeLoader(); }, []);
+  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
   useEffect(() => { init(); }, [init]);
 
   const stats = payload?.stats;
@@ -333,7 +335,7 @@ export default function InsightsPage() {
   const sectionsWithData = SECTIONS_ORDER.filter((s) => insightsBySection[s].length > 0);
 
   return (
-    <DashboardShell>
+    <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
       <div className="flex h-full min-h-screen">
         {/* Side nav */}
         <nav className="sticky top-0 hidden h-screen w-48 shrink-0 overflow-y-auto border-r border-border py-6 lg:block">

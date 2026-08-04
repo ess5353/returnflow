@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -287,6 +288,7 @@ function LogsPanel({ token, onClose }: { token: string; onClose: () => void }) {
 
 export default function ApiKeysPage() {
   const { authHeader: token } = useAuth();
+  const { settings, loadSettings } = useStoreSettings();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -310,7 +312,7 @@ export default function ApiKeysPage() {
     else setLoading(false);
   }, [fetchKeys]);
 
-  useEffect(() => { AppBridgeHelper.closeLoader(); }, []);
+  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
   useEffect(() => { init(); }, [init]);
 
   async function handleRevoke(id: string) {
@@ -334,7 +336,7 @@ export default function ApiKeysPage() {
   }
 
   return (
-    <DashboardShell>
+    <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
       <div className="mx-auto max-w-3xl space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">

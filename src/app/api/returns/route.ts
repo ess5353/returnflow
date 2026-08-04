@@ -102,12 +102,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Merchant not found' }, { status: 500 });
   }
 
-  // Enforce operation mode server-side
-  const { data: merchantSettings } = await supabaseAdmin
-    .from('store_settings')
-    .select('operation_mode')
-    .eq('merchant_id', merchant_id)
-    .maybeSingle();
+  // Compute startOfDay before parallel queries (synchronous)
+  const now = new Date();
+  const datePart = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+
+  // Run mode check, billing, duplicate check, and sequence count in parallel
+  const [{ data: merchantSettings }, entitlement, { data: existing }, { count }] = await Promise.all([
+    supabaseAdmin
+      .from('store_settings')
+      .select('operation_mode')
+      .eq('merchant_id', merchant_id)
+      .maybeSingle(),
+    getBillingEntitlement(merchant_id),
+    supabaseAdmin
+      .from('return_requests')
+      .select('id')
+      .eq('order_id', String(order_id))
+      .eq('merchant_id', merchant_id)
+      .eq('request_type', rType),
+    supabaseAdmin
+      .from('return_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('merchant_id', merchant_id)
+      .eq('request_type', rType)
+      .gte('created_at', startOfDay),
+  ]);
 
   const opMode = merchantSettings?.operation_mode ?? 'both';
   if (opMode === 'return_only' && rType === 'exchange') {
@@ -117,8 +137,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Bu mağaza yalnızca değişim taleplerini kabul etmektedir.' }, { status: 400 });
   }
 
-  // Billing gate — block if trial expired or subscription cancelled
-  const entitlement = await getBillingEntitlement(merchant_id);
   if (entitlement.isExpired) {
     return NextResponse.json(
       { error: 'Subscription expired', code: 'PLAN_EXPIRED', upgrade_required: true },
@@ -126,29 +144,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // One return OR one exchange per order per merchant (not two of the same type)
-  const { data: existing } = await supabaseAdmin
-    .from('return_requests')
-    .select('id')
-    .eq('order_id', String(order_id))
-    .eq('merchant_id', merchant_id)
-    .eq('request_type', rType);
-
   if (existing && existing.length > 0) {
     return NextResponse.json({ error: 'DUPLICATE' }, { status: 409 });
   }
-
-  // Generate number (merchant + type scoped daily sequence)
-  const now = new Date();
-  const datePart = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-
-  const { count } = await supabaseAdmin
-    .from('return_requests')
-    .select('*', { count: 'exact', head: true })
-    .eq('merchant_id', merchant_id)
-    .eq('request_type', rType)
-    .gte('created_at', startOfDay);
 
   const sequence = String((count ?? 0) + 1).padStart(4, '0');
   const prefix = rType === 'exchange' ? 'EX' : 'RF';

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { cn } from '@/lib/utils';
 import { BookOpen, ChevronRight, Copy, Check } from 'lucide-react';
 import { PageHelp } from '@/components/ui/page-help';
@@ -78,8 +79,9 @@ const SECTIONS = [
 
 export default function ApiDocsPage() {
   const [activeSection, setActiveSection] = useState('authentication');
+  const { settings, loadSettings } = useStoreSettings();
 
-  useEffect(() => { AppBridgeHelper.closeLoader(); }, []);
+  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -98,7 +100,7 @@ export default function ApiDocsPage() {
   }, []);
 
   return (
-    <DashboardShell>
+    <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
       <div className="flex h-full min-h-screen">
         {/* Sidebar nav */}
         <nav className="sticky top-0 hidden h-screen w-52 shrink-0 overflow-y-auto border-r border-border py-6 lg:block">

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { AppBridgeHelper } from '@ikas/app-helpers';
+import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -544,6 +545,7 @@ function WebhookCard({
 
 export default function WebhooksPage() {
   const { authHeader: token } = useAuth();
+  const { settings, loadSettings } = useStoreSettings();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalState | null>(null);
@@ -562,7 +564,7 @@ export default function WebhooksPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { AppBridgeHelper.closeLoader(); }, []);
+  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
   useEffect(() => {
     if (token) fetchWebhooks(token!);
     else setLoading(false);
@@ -583,7 +585,7 @@ export default function WebhooksPage() {
   }
 
   return (
-    <DashboardShell>
+    <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
       <div className="mx-auto max-w-3xl space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">

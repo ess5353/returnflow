@@ -23,22 +23,22 @@ export async function POST(request: NextRequest) {
   // and haven't been synced in the last 2 hours
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
-  const { data: merchants, error } = await supabaseAdmin
-    .from('merchant_billing')
-    .select('merchant_id')
-    .not('ikas_subscription_key', 'is', null)
-    .or(`ikas_last_synced_at.is.null,ikas_last_synced_at.lt.${twoHoursAgo}`);
+  const [{ data: merchants, error }, { data: tokens }] = await Promise.all([
+    supabaseAdmin
+      .from('merchant_billing')
+      .select('merchant_id')
+      .not('ikas_subscription_key', 'is', null)
+      .or(`ikas_last_synced_at.is.null,ikas_last_synced_at.lt.${twoHoursAgo}`),
+    supabaseAdmin
+      .from('auth_tokens')
+      .select('merchant_id, authorized_app_id')
+      .eq('deleted', false),
+  ]);
 
   if (error) {
     console.error('billing/sync: query error:', error);
     return NextResponse.json({ error: 'Query failed' }, { status: 500 });
   }
-
-  // Also fetch auth tokens to map merchantId → authorizedAppId
-  const { data: tokens } = await supabaseAdmin
-    .from('auth_tokens')
-    .select('merchant_id, authorized_app_id')
-    .eq('deleted', false);
 
   const tokenMap = new Map<string, string>(
     (tokens ?? []).map((t) => [t.merchant_id as string, t.authorized_app_id as string]),
