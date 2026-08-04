@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       contact_phone: body.contact_phone ?? null,
       return_instructions: body.return_instructions ?? null,
       return_deadline_days: body.return_deadline_days ?? null,
-      operation_mode: body.operation_mode ?? null,
+      operation_mode: body.operation_mode ?? 'both',
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'merchant_id' },
