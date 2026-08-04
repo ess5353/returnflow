@@ -229,8 +229,7 @@ export function ExportModal({ open, onClose, token }: ExportModalProps) {
       }).then(() => loadHistory()).catch(() => {});
 
       toast(`${formattedRows.length} satır dışa aktarıldı`, 'success');
-    } catch (err) {
-      console.error('Export error:', err);
+    } catch {
       toast('Dışa aktarma başarısız', 'error');
       reset();
     } finally {

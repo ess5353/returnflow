@@ -29,8 +29,8 @@ export function useStoreSettings() {
       if (result.data) {
         setSettings(result.data as StoreSettings);
       }
-    } catch (err) {
-      console.error('Settings yüklenemedi:', err);
+    } catch {
+      // silently fail — settings are non-critical for dashboard function
     }
   }, []);
 

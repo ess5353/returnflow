@@ -52,26 +52,37 @@ export default function TrackPage() {
   const [email, setEmail] = useState('');
   const [request, setRequest] = useState<ReturnRequest | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [settings, setSettings] = useState<PublicStoreSettings | null>(null);
 
   useEffect(() => {
     fetch('/api/store-settings')
       .then((r) => r.json())
       .then((result) => { if (result.data) setSettings(result.data); })
-      .catch((err) => console.error('Store settings yüklenemedi:', err));
+      .catch(() => undefined);
   }, []);
 
   const searchRequest = async () => {
-    const params = new URLSearchParams({ q: trackingId.trim(), email: email.trim() });
-    const res = await fetch(`/api/track?${params.toString()}`);
-    const result = await res.json();
-
-    if (result.data && result.data.length > 0) {
-      setRequest(result.data[0] as ReturnRequest);
-      setNotFound(false);
-    } else {
-      setRequest(null);
-      setNotFound(true);
+    if (!trackingId.trim() || !email.trim()) return;
+    setSearching(true);
+    setSearchError(false);
+    setNotFound(false);
+    setRequest(null);
+    try {
+      const params = new URLSearchParams({ q: trackingId.trim(), email: email.trim() });
+      const res = await fetch(`/api/track?${params.toString()}`);
+      if (!res.ok) { setSearchError(true); return; }
+      const result = await res.json();
+      if (result.data && result.data.length > 0) {
+        setRequest(result.data[0] as ReturnRequest);
+      } else {
+        setNotFound(true);
+      }
+    } catch {
+      setSearchError(true);
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -133,6 +144,7 @@ export default function TrackPage() {
                   id="trackingId"
                   value={trackingId}
                   onChange={(e) => setTrackingId(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchRequest()}
                   placeholder="#1001 veya RF-2024.01.01-0001"
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
                 />
@@ -145,6 +157,7 @@ export default function TrackPage() {
                   id="trackEmail"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchRequest()}
                   placeholder="siparis@email.com"
                   type="email"
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
@@ -152,13 +165,24 @@ export default function TrackPage() {
               </div>
               <button
                 onClick={searchRequest}
+                disabled={searching}
                 style={{ background: accentColor }}
-                className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90"
+                className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Sorgula
+                {searching ? 'Aranıyor...' : 'Sorgula'}
               </button>
             </div>
           </div>
+
+          {/* Error */}
+          {searchError && (
+            <div className="p-6 md:p-8">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5">
+                <p className="font-semibold text-sm text-amber-700">Bağlantı hatası</p>
+                <p className="mt-1 text-sm text-amber-600">Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.</p>
+              </div>
+            </div>
+          )}
 
           {/* Not found */}
           {notFound && (

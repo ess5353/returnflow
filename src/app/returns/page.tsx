@@ -61,7 +61,7 @@ export default function ReturnsPage() {
     fetch('/api/store-settings')
       .then((res) => res.json())
       .then((result) => { if (result.data) setSettings(result.data); })
-      .catch((err) => console.error('Store settings yüklenemedi:', err));
+      .catch(() => undefined);
   }, []);
 
   const createRequest = async () => {
@@ -74,7 +74,6 @@ export default function ReturnsPage() {
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extension}`;
         const { error: uploadError } = await supabase.storage.from('return-files').upload(fileName, file);
         if (uploadError) {
-          console.error('Dosya yüklenemedi:', uploadError);
           setIsSubmitting(false);
           toast('Dosya yüklenemedi', 'error');
           return;

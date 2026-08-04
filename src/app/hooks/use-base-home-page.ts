@@ -50,9 +50,7 @@ export function useBaseHomePage() {
         // No valid token found - need to handle authorization flow
         await handleAuthorizationFlow();
 
-      } catch (error) {
-        console.error('Error during base home page initialization:', error);
-        
+      } catch {
         // Fallback to authorization page on any unexpected errors
         router.push('/authorize-store');
       } finally {

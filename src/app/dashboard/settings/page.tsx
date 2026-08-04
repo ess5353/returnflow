@@ -51,8 +51,8 @@ export default function SettingsPage() {
         const mode = d.operation_mode;
         setOperationMode(mode === 'return_only' || mode === 'exchange_only' ? mode : 'both');
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      toast('Ayarlar yüklenemedi. Sayfayı yenileyin.', 'error');
     } finally {
       setLoading(false);
     }
@@ -80,7 +80,6 @@ export default function SettingsPage() {
       const { error: uploadError } = await supabase.storage.from('store-assets').upload(fileName, logoFile, { upsert: true });
 
       if (uploadError) {
-        console.error('Logo yüklenemedi:', uploadError);
         toast(`Logo yüklenemedi: ${uploadError.message}`, 'error');
         setSaving(false);
         return;
@@ -192,8 +191,22 @@ export default function SettingsPage() {
                     )}
                     <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted-foreground hover:bg-muted transition-colors">
                       <Upload className="h-4 w-4" />
-                      Logo Yükle
-                      <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="hidden" />
+                      {logoFile ? logoFile.name : 'Logo Yükle'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 5 * 1024 * 1024) {
+                            toast('Logo dosyası 5 MB sınırını aşıyor', 'error');
+                            e.target.value = '';
+                            return;
+                          }
+                          setLogoFile(file);
+                        }}
+                      />
                     </label>
                   </div>
                 </div>

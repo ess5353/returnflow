@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
     .from('webhooks')
     .select('id, name, url, secret, enabled, events, created_at, updated_at')
     .eq('merchant_id', user.merchantId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100);
 
   if (error) {
     console.error('webhooks GET error:', error);
