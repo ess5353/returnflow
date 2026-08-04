@@ -114,7 +114,7 @@ export default function TrackPage() {
           )}
           <div>
             <p className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">Return Portal</p>
-            <p className="text-sm font-bold leading-tight">{settings?.store_name || 'PELYXCOMMERCE'}</p>
+            <p className="text-sm font-bold leading-tight">{settings?.store_name || 'Mağaza'}</p>
           </div>
         </div>
 
