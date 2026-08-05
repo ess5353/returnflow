@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
-import { Check, ChevronRight, Copy, FlaskConical, RefreshCw, Trash2, X } from 'lucide-react';
+import { Check, ChevronRight, Copy, Film, FlaskConical, RefreshCw, Trash2, X } from 'lucide-react';
 import { OnboardingWizard } from '@/components/onboarding/wizard';
 import { OnboardingChecklist } from '@/components/onboarding/checklist';
 import { PageHelp } from '@/components/ui/page-help';
@@ -53,7 +53,7 @@ function statusVariant(status: string): 'pending' | 'approved' | 'rejected' | 's
 
 const DATE_FILTERS = ['Bugün', 'Son 7 Gün', 'Son 30 Gün', 'Bu Ay', 'Tümü'] as const;
 const STATUS_FILTERS = ['Tümü', 'Yeni Talep', 'Onaylandı', 'Reddedildi'] as const;
-const PORTAL_URL = `${process.env.NEXT_PUBLIC_DEPLOY_URL ?? ''}/returns`;
+const DEPLOY_URL = process.env.NEXT_PUBLIC_DEPLOY_URL ?? '';
 
 export default function DashboardPage() {
   const { authHeader: token } = useAuth();
@@ -252,24 +252,29 @@ export default function DashboardPage() {
         {!loading && <OnboardingChecklist />}
 
         {/* Portal link */}
-        <div className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">İade Portalı</p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => { navigator.clipboard.writeText(PORTAL_URL); toast('Portal linki kopyalandı', 'success'); }}
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Linki Kopyala
-            </Button>
-          </div>
-          <code className="block w-full truncate rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{PORTAL_URL}</code>
-          <p className="text-xs text-muted-foreground">
-            Bu bağlantıyı web sitenizde <span className="font-medium text-foreground">İade / Değişim</span> butonu olarak kullanabilirsiniz. Müşterileriniz sipariş numaraları ile iade veya değişim talebini buradan oluşturabilir.
-          </p>
-        </div>
+        {settings?.store_key && (() => {
+          const portalUrl = `${DEPLOY_URL}/returns/${settings.store_key}`;
+          return (
+            <div className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">İade Portalı</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => { navigator.clipboard.writeText(portalUrl); toast('Portal linki kopyalandı', 'success'); }}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Linki Kopyala
+                </Button>
+              </div>
+              <code className="block w-full truncate rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{portalUrl}</code>
+              <p className="text-xs text-muted-foreground">
+                Bu bağlantıyı web sitenizde <span className="font-medium text-foreground">İade / Değişim</span> butonu olarak kullanabilirsiniz. Müşterileriniz sipariş numaraları ile iade veya değişim talebini buradan oluşturabilir.
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Main content grid */}
         <div className="grid lg:grid-cols-[1fr_360px] gap-6">
@@ -361,8 +366,24 @@ export default function DashboardPage() {
                       <button
                         key={req.id}
                         onClick={() => { setSelectedRequest(req); setAdminNote(req.admin_note || ''); }}
-                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${isSelected ? 'bg-muted/50' : ''}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${isSelected ? 'bg-muted/50' : ''}`}
                       >
+                        {/* Media thumbnail */}
+                        {req.media_urls && req.media_urls.length > 0 ? (
+                          /\.(mp4|mov|webm)/i.test(req.media_urls[0]) ? (
+                            <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted border border-border">
+                              <Film className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          ) : (
+                            <img
+                              src={req.media_urls[0]}
+                              alt=""
+                              className="hidden sm:block h-9 w-9 shrink-0 rounded-md object-cover border border-border"
+                            />
+                          )
+                        ) : (
+                          <div className="hidden sm:block h-9 w-9 shrink-0" />
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs font-medium text-foreground">{req.rf_number}</span>

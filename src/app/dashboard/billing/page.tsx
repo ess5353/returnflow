@@ -27,18 +27,42 @@ const PLAN_BADGE: Record<Plan, string> = {
 };
 
 function TrialCountdown({ endsAt }: { endsAt: string }) {
-  const daysLeft = Math.max(0, Math.ceil((new Date(endsAt).getTime() - Date.now()) / 86400000));
+  const TRIAL_DAYS = 14;
+  const trialStartMs = new Date(endsAt).getTime() - TRIAL_DAYS * 86400000;
+  const remainingMs = Math.max(0, new Date(endsAt).getTime() - Date.now());
+  const totalMs = TRIAL_DAYS * 86400000;
+  const usedMs = Math.max(0, totalMs - remainingMs);
+  const progressPct = Math.min(100, Math.round((usedMs / totalMs) * 100));
+
+  const daysLeft = Math.floor(remainingMs / 86400000);
+  const hoursLeft = Math.floor((remainingMs % 86400000) / 3600000);
   const urgent = daysLeft <= 3;
+
+  const timeLabel =
+    remainingMs === 0 ? 'Deneme süresi sona erdi'
+    : daysLeft === 0 ? `${hoursLeft} saat kaldı`
+    : daysLeft <= 3 ? `${daysLeft} gün ${hoursLeft} saat kaldı`
+    : `${daysLeft} gün kaldı`;
+
+  void trialStartMs;
+
   return (
-    <div className={cn('rounded-xl border px-4 py-3', urgent ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50')}>
+    <div className={cn('rounded-xl border px-4 py-4 space-y-3', urgent ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50')}>
       <div className="flex items-center gap-2">
         <AlertTriangle className={cn('h-4 w-4 shrink-0', urgent ? 'text-red-500' : 'text-amber-500')} />
         <span className={cn('text-sm font-semibold', urgent ? 'text-red-700' : 'text-amber-700')}>
-          Deneme sürenizin bitmesine {daysLeft} gün kaldı
+          {timeLabel}
         </span>
       </div>
-      <p className={cn('mt-1 text-xs', urgent ? 'text-red-600' : 'text-amber-600')}>
-        {new Date(endsAt).toLocaleDateString('tr-TR')} tarihinde sona erecek. Erişimi sürdürmek için Pro plana geçin.
+      {/* Progress bar */}
+      <div className="h-2 rounded-full overflow-hidden bg-black/10">
+        <div
+          className={cn('h-full rounded-full transition-all', urgent ? 'bg-red-500' : 'bg-amber-500')}
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+      <p className={cn('text-xs', urgent ? 'text-red-600' : 'text-amber-600')}>
+        Bitiş: {new Date(endsAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })} · Erişimi sürdürmek için Pro plana geçin.
       </p>
     </div>
   );

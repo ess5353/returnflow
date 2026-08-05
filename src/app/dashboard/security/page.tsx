@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertTriangle, CheckCircle2, ShieldCheck, XCircle, RefreshCw, Lock, Key, Package2, Route,
 } from 'lucide-react';
+import { OPTIONAL_CHECKS } from '@/lib/security/env-check';
 import { cn } from '@/lib/utils';
 import { PageHelp } from '@/components/ui/page-help';
 
@@ -63,13 +64,19 @@ function ScoreRing({ pct }: { pct: number }) {
 }
 
 function Check({ label, passed }: { label: string; passed: boolean }) {
+  const isOptional = OPTIONAL_CHECKS.has(label as string);
   return (
     <div className="flex items-center gap-2 text-sm">
       {passed
         ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-        : <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+        : isOptional
+          ? <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+          : <XCircle className="h-4 w-4 text-red-500 shrink-0" />
       }
-      <span className={passed ? 'text-foreground' : 'text-red-600 font-medium'}>{label}</span>
+      <span className={passed ? 'text-foreground' : isOptional ? 'text-amber-600' : 'text-red-600 font-medium'}>
+        {label}
+        {isOptional && !passed && <span className="ml-1 text-xs font-normal text-muted-foreground">(opsiyonel)</span>}
+      </span>
     </div>
   );
 }

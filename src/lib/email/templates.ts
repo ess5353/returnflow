@@ -182,6 +182,7 @@ function layout(opts: {
 const receivedBody = `
     <div style="padding:20px 32px 8px;">
       ${section('Sonraki Adım', '<p style="font-size:13px;color:#374151;margin:0;line-height:1.65;">Talebinizi en kısa sürede inceleyeceğiz. Durum değişikliklerinde e-posta ile bilgilendirileceksiniz.</p>')}
+      {{#if return_address}}${section('İade Gönderi Adresi', '<p style="font-size:13px;color:#374151;margin:0;line-height:1.65;white-space:pre-line;">{{return_address}}</p><p style="font-size:11px;color:#6b7280;margin:6px 0 0;">Onay beklemeden ürünü bu adrese gönderebilirsiniz.</p>')}{{/if}}
       {{#if contact_phone}}${section('İletişim', '<p style="font-size:13px;font-weight:600;color:#111;margin:0;">{{contact_phone}}</p>')}{{/if}}
     </div>`;
 

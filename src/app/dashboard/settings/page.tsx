@@ -5,6 +5,7 @@ import { AppBridgeHelper } from '@ikas/app-helpers';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { invalidateSettingsCache } from '@/app/hooks/use-store-settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -130,6 +131,7 @@ export default function SettingsPage() {
     if (uploadedLogo) setLogoUrl(uploadedLogo);
     setLogoFile(null);
 
+    invalidateSettingsCache();
     toast('Ayarlar başarıyla kaydedildi ✓', 'success');
   };
 

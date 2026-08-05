@@ -37,26 +37,39 @@ export function getMissingRequired(): string[] {
     .map((e) => e.key);
 }
 
+// Checks that count toward the security score (security-critical only).
+const SCORED_CHECKS = [
+  'Security headers configured',
+  'Critical env vars present',
+  'HTTPS deploy URL',
+  'Rate limiting active',
+  'Input validation',
+  'CSRF protection',
+] as const;
+
+// Informational checks — shown in UI but do NOT affect score.
+// Failing these shows amber, not red.
+export const OPTIONAL_CHECKS = new Set([
+  'Email service configured',
+  'AI service configured',
+]);
+
 export function computeSecurityScore(): { score: number; max: number; checks: Record<string, boolean> } {
   const entries = checkEnvVars();
   const requiredPresent = entries.filter((e) => e.required).every((e) => e.present);
-  const optionalPresent = entries.filter((e) => !e.required).every((e) => e.present);
   const httpsDeployUrl = (process.env.NEXT_PUBLIC_DEPLOY_URL ?? '').startsWith('https://');
-  const hasCronSecret = Boolean(process.env.CRON_SECRET);
   const hasResend = Boolean(process.env.RESEND_API_KEY);
   const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
 
-  const checks = {
-    'Security headers configured': true,       // always true after Phase 6
+  const checks: Record<string, boolean> = {
+    'Security headers configured': true,
     'Critical env vars present': requiredPresent,
     'HTTPS deploy URL': httpsDeployUrl,
-    'Rate limiting active': true,              // always true after Phase 6
-    'Input validation': true,                  // always true after Phase 6
-    'CSRF protection': true,                   // JWT-in-header scheme
-    'Cron secret set': hasCronSecret,
+    'Rate limiting active': true,
+    'Input validation': true,
+    'CSRF protection': true,
     'Email service configured': hasResend,
     'AI service configured': hasOpenAI,
-    'All optional secrets set': optionalPresent,
   };
 
   const weights: Record<string, number> = {
@@ -66,18 +79,14 @@ export function computeSecurityScore(): { score: number; max: number; checks: Re
     'Rate limiting active': 10,
     'Input validation': 10,
     'CSRF protection': 5,
-    'Cron secret set': 5,
-    'Email service configured': 5,
-    'AI service configured': 3,
-    'All optional secrets set': 2,
   };
 
   let score = 0;
   let max = 0;
-  for (const [check, passed] of Object.entries(checks)) {
+  for (const check of SCORED_CHECKS) {
     const w = weights[check] ?? 5;
     max += w;
-    if (passed) score += w;
+    if (checks[check]) score += w;
   }
 
   return { score, max, checks };

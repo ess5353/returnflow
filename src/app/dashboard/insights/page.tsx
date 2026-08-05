@@ -316,13 +316,11 @@ export default function InsightsPage() {
     setRefreshing(false);
   }, []);
 
-  const init = useCallback(async () => {
-    if (token) await fetchInsights(token!);
-    else setLoading(false);
-  }, [fetchInsights]);
-
   useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
-  useEffect(() => { init(); }, [init]);
+  useEffect(() => {
+    if (!token) { setLoading(false); return; }
+    fetchInsights(token);
+  }, [token, fetchInsights]);
 
   const stats = payload?.stats;
   const insights = payload?.insights ?? [];

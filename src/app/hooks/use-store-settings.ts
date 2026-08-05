@@ -12,12 +12,26 @@ export type StoreSettings = {
   primary_color: string | null;
   return_address: string | null;
   return_policy: string | null;
+  store_key: string | null;
+  operation_mode: 'both' | 'return_only' | 'exchange_only' | null;
 };
 
+// Module-level cache persists across client-side page navigations,
+// preventing the logo/store-name flicker on each route change.
+let _cachedSettings: StoreSettings | null = null;
+
+export function invalidateSettingsCache() {
+  _cachedSettings = null;
+}
+
 export function useStoreSettings() {
-  const [settings, setSettings] = useState<StoreSettings | null>(null);
+  const [settings, setSettings] = useState<StoreSettings | null>(_cachedSettings);
 
   const loadSettings = useCallback(async () => {
+    if (_cachedSettings) {
+      setSettings(_cachedSettings);
+      return;
+    }
     try {
       const token = await TokenHelpers.getTokenForIframeApp();
       if (!token) return;
@@ -27,12 +41,17 @@ export function useStoreSettings() {
       });
       const result = await res.json();
       if (result.data) {
-        setSettings(result.data as StoreSettings);
+        _cachedSettings = result.data as StoreSettings;
+        setSettings(_cachedSettings);
       }
     } catch {
       // silently fail — settings are non-critical for dashboard function
     }
   }, []);
 
-  return { settings, loadSettings };
+  const invalidateCache = useCallback(() => {
+    _cachedSettings = null;
+  }, []);
+
+  return { settings, loadSettings, invalidateCache };
 }

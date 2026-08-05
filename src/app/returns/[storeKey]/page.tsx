@@ -55,6 +55,8 @@ export default function ReturnsPage() {
   const [createdRfNumber, setCreatedRfNumber] = useState('');
   const [selectedItems, setSelectedItems] = useState<{ name: string; quantity: number; price: number }[]>([]);
   const [settings, setSettings] = useState<PublicStoreSettings | null>(null);
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const [totalFilesCount, setTotalFilesCount] = useState(0);
 
   useEffect(() => {
     if (!storeKey) return;
@@ -66,21 +68,25 @@ export default function ReturnsPage() {
 
   const createRequest = async () => {
     setIsSubmitting(true);
+    setUploadedCount(0);
+
+    const fileList = files ? Array.from(files) : [];
+    setTotalFilesCount(fileList.length);
 
     const uploadedUrls: string[] = [];
-    if (files) {
-      for (const file of Array.from(files)) {
-        const extension = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extension}`;
-        const { error: uploadError } = await supabase.storage.from('return-files').upload(fileName, file);
-        if (uploadError) {
-          setIsSubmitting(false);
-          toast('Dosya yüklenemedi', 'error');
-          return;
-        }
-        const { data } = supabase.storage.from('return-files').getPublicUrl(fileName);
-        uploadedUrls.push(data.publicUrl);
+    for (const file of fileList) {
+      const extension = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from('return-files').upload(fileName, file);
+      if (uploadError) {
+        setIsSubmitting(false);
+        setTotalFilesCount(0);
+        toast('Dosya yüklenemedi', 'error');
+        return;
       }
+      const { data } = supabase.storage.from('return-files').getPublicUrl(fileName);
+      uploadedUrls.push(data.publicUrl);
+      setUploadedCount((n) => n + 1);
     }
 
     const payload: Record<string, unknown> = {
@@ -125,6 +131,7 @@ export default function ReturnsPage() {
 
     setCreatedRfNumber(result.data.rf_number);
     setIsSubmitting(false);
+    setTotalFilesCount(0);
     setStep('success');
   };
 
@@ -477,13 +484,28 @@ export default function ReturnsPage() {
                     <p className="mt-1.5 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV — maks 10 MB.</p>
                   </div>
 
+                  {isSubmitting && totalFilesCount > 0 && (
+                    <div className="mb-3 space-y-1.5">
+                      <p className="text-xs text-gray-500 text-center">
+                        Dosyalar yükleniyor... ({uploadedCount}/{totalFilesCount})
+                      </p>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ background: accentColor, width: `${totalFilesCount > 0 ? Math.round((uploadedCount / totalFilesCount) * 100) : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <button
                     disabled={!reason || isSubmitting}
                     onClick={createRequest}
                     style={{ background: accentColor }}
                     className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-30"
                   >
-                    {isSubmitting ? 'Yükleniyor...' : 'İade Talebi Oluştur'}
+                    {isSubmitting
+                      ? (totalFilesCount > 0 ? 'Video yükleniyor...' : 'Gönderiliyor...')
+                      : 'İade Talebi Oluştur'}
                   </button>
                   <button onClick={() => setStep(operationMode === 'both' ? 'type' : 'order')} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors">
                     ← Geri Dön
@@ -565,13 +587,28 @@ export default function ReturnsPage() {
                     <p className="mt-1.5 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV — maks 10 MB.</p>
                   </div>
 
+                  {isSubmitting && totalFilesCount > 0 && (
+                    <div className="mb-3 space-y-1.5">
+                      <p className="text-xs text-gray-500 text-center">
+                        Dosyalar yükleniyor... ({uploadedCount}/{totalFilesCount})
+                      </p>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ background: accentColor, width: `${totalFilesCount > 0 ? Math.round((uploadedCount / totalFilesCount) * 100) : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <button
                     disabled={!canSubmitExchange || isSubmitting}
                     onClick={createRequest}
                     style={{ background: accentColor }}
                     className="w-full rounded-xl py-3.5 font-bold text-white text-sm transition-opacity hover:opacity-90 disabled:opacity-30"
                   >
-                    {isSubmitting ? 'Yükleniyor...' : 'Değişim Talebi Oluştur'}
+                    {isSubmitting
+                      ? (totalFilesCount > 0 ? 'Video yükleniyor...' : 'Gönderiliyor...')
+                      : 'Değişim Talebi Oluştur'}
                   </button>
                   <button onClick={() => setStep(operationMode === 'both' ? 'type' : 'order')} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors">
                     ← Geri Dön
@@ -609,6 +646,13 @@ export default function ReturnsPage() {
                     >
                       Takibime Git
                     </a>
+
+                    {settings?.return_address && requestType === 'return' && (
+                      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                        <p className="text-xs font-semibold text-blue-700 mb-1">İade Adresi</p>
+                        <p className="text-sm text-blue-900 whitespace-pre-line leading-relaxed">{settings.return_address}</p>
+                      </div>
+                    )}
 
                     <div className="mt-5 grid grid-cols-2 gap-4">
                       <div>

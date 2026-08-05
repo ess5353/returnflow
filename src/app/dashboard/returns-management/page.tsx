@@ -589,6 +589,13 @@ export default function ReturnsManagementPage() {
     setStatusFilter('Tümü');
   }, [typeTab]);
 
+  // Force tab to match operation_mode when settings load
+  useEffect(() => {
+    const mode = settings?.operation_mode;
+    if (mode === 'return_only') setTypeTab('return');
+    else if (mode === 'exchange_only') setTypeTab('exchange');
+  }, [settings?.operation_mode]);
+
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const toggleRow = (id: string) =>
@@ -791,35 +798,37 @@ export default function ReturnsManagementPage() {
               </div>
             </div>
 
-            {/* Type tab */}
-            <div className="flex rounded-xl border border-border overflow-hidden text-sm font-semibold w-fit">
-              <button
-                onClick={() => setTypeTab('return')}
-                className={cn(
-                  'flex items-center gap-2 px-5 py-2.5 transition-colors',
-                  typeTab === 'return' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                İadeler
-                <span className={cn('text-xs rounded-md px-1.5 py-0.5', typeTab === 'return' ? 'bg-white/20 text-background' : 'bg-muted text-muted-foreground')}>
-                  {rows.filter((r) => (r.request_type ?? 'return') === 'return').length}
-                </span>
-              </button>
-              <button
-                onClick={() => setTypeTab('exchange')}
-                className={cn(
-                  'flex items-center gap-2 px-5 py-2.5 transition-colors',
-                  typeTab === 'exchange' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <ArrowLeftRight className="h-3.5 w-3.5" />
-                Değişimler
-                <span className={cn('text-xs rounded-md px-1.5 py-0.5', typeTab === 'exchange' ? 'bg-white/20 text-background' : 'bg-muted text-muted-foreground')}>
-                  {rows.filter((r) => r.request_type === 'exchange').length}
-                </span>
-              </button>
-            </div>
+            {/* Type tab — hidden when mode forces single type */}
+            {settings?.operation_mode !== 'return_only' && settings?.operation_mode !== 'exchange_only' && (
+              <div className="flex rounded-xl border border-border overflow-hidden text-sm font-semibold w-fit">
+                <button
+                  onClick={() => setTypeTab('return')}
+                  className={cn(
+                    'flex items-center gap-2 px-5 py-2.5 transition-colors',
+                    typeTab === 'return' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  İadeler
+                  <span className={cn('text-xs rounded-md px-1.5 py-0.5', typeTab === 'return' ? 'bg-white/20 text-background' : 'bg-muted text-muted-foreground')}>
+                    {rows.filter((r) => (r.request_type ?? 'return') === 'return').length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setTypeTab('exchange')}
+                  className={cn(
+                    'flex items-center gap-2 px-5 py-2.5 transition-colors',
+                    typeTab === 'exchange' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <ArrowLeftRight className="h-3.5 w-3.5" />
+                  Değişimler
+                  <span className={cn('text-xs rounded-md px-1.5 py-0.5', typeTab === 'exchange' ? 'bg-white/20 text-background' : 'bg-muted text-muted-foreground')}>
+                    {rows.filter((r) => r.request_type === 'exchange').length}
+                  </span>
+                </button>
+              </div>
+            )}
 
             {/* Search + filters bar */}
             <div className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-3">
