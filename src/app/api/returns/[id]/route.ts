@@ -9,7 +9,7 @@ import { createAuditLog, getIp, type AuditAction } from '@/lib/audit/log';
 import { sendReturnEmail } from '@/lib/email/send';
 import type { TemplateType } from '@/lib/email/templates';
 
-const VALID_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Kargo Bekleniyor', 'Kargo Alındı', 'İade Edildi', 'Tamamlandı']);
+const VALID_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Kargo Bekleniyor', 'Kargo Alındı', 'Kargoya Verildi', 'İade Edildi', 'Tamamlandı']);
 const NOTIFIABLE_STATUSES = VALID_STATUSES;
 
 // ── PATCH: update status and/or admin_note ─────────────────────────────────
@@ -95,6 +95,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         } else if (newStatus === 'Kargo Alındı') {
           type = isExchange ? 'exchange_approved' : 'return_approved';
           title = `Kargo Alındı: ${data.rf_number}`;
+        } else if (newStatus === 'Kargoya Verildi') {
+          type = 'exchange_approved';
+          title = `Yeni Ürün Kargoya Verildi: ${data.rf_number}`;
         } else if (newStatus === 'İade Edildi') {
           type = 'refund_completed';
           title = `İade İşlendi: ${data.rf_number}`;
@@ -133,6 +136,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           'Reddedildi': 'return.rejected',
           'Kargo Bekleniyor': isExchange ? 'exchange.shipment_awaited' : 'return.shipment_awaited',
           'Kargo Alındı': isExchange ? 'exchange.shipment_received' : 'return.shipment_received',
+          'Kargoya Verildi': 'exchange.shipped',
           'İade Edildi': 'return.refunded',
           'Tamamlandı': isExchange ? 'exchange.completed' : 'return.completed',
         };

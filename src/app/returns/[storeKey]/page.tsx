@@ -338,7 +338,7 @@ export default function ReturnsPage() {
 
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5 mb-6">
                     <p className="text-xs text-gray-500">Sipariş No</p>
-                    <p className="font-bold text-lg mt-0.5">{order.id as string}</p>
+                    <p className="font-bold text-lg mt-0.5">#{order.order_no as string}</p>
 
                     <div className="mt-5">
                       <p className="text-xs text-gray-500 mb-3">Ürünler</p>
@@ -640,7 +640,7 @@ export default function ReturnsPage() {
                     <p className="text-xs text-gray-500">Talep No</p>
                     <p className="text-2xl font-bold font-mono mt-0.5">{createdRfNumber}</p>
                     <a
-                      href={`/track/${storeKey}`}
+                      href={`/track/${storeKey}?rf=${encodeURIComponent(createdRfNumber)}&email=${encodeURIComponent(email)}`}
                       style={{ background: accentColor }}
                       className="mt-4 inline-flex rounded-xl px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity"
                     >

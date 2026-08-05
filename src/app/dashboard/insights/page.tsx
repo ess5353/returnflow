@@ -316,7 +316,7 @@ export default function InsightsPage() {
     setRefreshing(false);
   }, []);
 
-  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
+  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(token); }, [loadSettings, token]);
   useEffect(() => {
     if (!token) { setLoading(false); return; }
     fetchInsights(token);

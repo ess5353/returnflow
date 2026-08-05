@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       },
       { onConflict: 'merchant_id,email' },
     )
-    .select('id, email, name, role, status')
+    .select('id, email, name, role, status, custom_permissions, invited_at, joined_at, created_at')
     .single();
 
   if (memberErr) {

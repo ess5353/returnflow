@@ -27,17 +27,20 @@ export function invalidateSettingsCache() {
 export function useStoreSettings() {
   const [settings, setSettings] = useState<StoreSettings | null>(_cachedSettings);
 
-  const loadSettings = useCallback(async () => {
+  const loadSettings = useCallback(async (authHeader?: string) => {
     if (_cachedSettings) {
       setSettings(_cachedSettings);
       return;
     }
     try {
-      const token = await TokenHelpers.getTokenForIframeApp();
-      if (!token) return;
+      // Prefer the caller's resolved auth header (covers both staff-JWT and
+      // ikas-iframe sessions via useAuth()); fall back to the raw iframe
+      // token lookup for callers that haven't been updated.
+      const header = authHeader ?? (await TokenHelpers.getTokenForIframeApp().then((t) => (t ? `JWT ${t}` : null)));
+      if (!header) return;
 
       const res = await fetch('/api/settings', {
-        headers: { Authorization: `JWT ${token}` },
+        headers: { Authorization: header },
       });
       const result = await res.json();
       if (result.data) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { cn } from '@/lib/utils';
@@ -79,9 +80,10 @@ const SECTIONS = [
 
 export default function ApiDocsPage() {
   const [activeSection, setActiveSection] = useState('authentication');
+  const { authHeader: token } = useAuth();
   const { settings, loadSettings } = useStoreSettings();
 
-  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
+  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(token); }, [loadSettings, token]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(

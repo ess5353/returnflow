@@ -564,7 +564,7 @@ export default function WebhooksPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
+  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(token); }, [loadSettings, token]);
   useEffect(() => {
     if (token) fetchWebhooks(token!);
     else setLoading(false);

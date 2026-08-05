@@ -111,21 +111,21 @@ export default function SecurityPage() {
 
   useEffect(() => {
     AppBridgeHelper.closeLoader();
-    loadSettings();
-  }, [loadSettings]);
+    loadSettings(token);
+  }, [loadSettings, token]);
 
   useEffect(() => {
     if (!token) { setLoading(false); return; }
     fetch('/api/security/audit', { headers: { Authorization: token ?? '' } })
       .then(async (r) => {
         if (!r.ok) {
-          setError(r.status === 403 ? 'Only owners can view the security dashboard.' : 'Failed to load audit data.');
+          setError(r.status === 403 ? 'Güvenlik panelini yalnızca mağaza sahibi görüntüleyebilir.' : 'Denetim verileri alınamadı.');
           return;
         }
         const j = await r.json();
         setAudit(j.data);
       })
-      .catch(() => setError('Network error'))
+      .catch(() => setError('Bağlantı hatası'))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -143,7 +143,7 @@ export default function SecurityPage() {
               <h1 className="text-xl font-bold">Güvenlik Denetimi</h1>
               <PageHelp title="Güvenlik" content={<p>Kritik ortam değişkenleri, HTTPS kullanımı ve güvenlik kontrollerinin özeti. Eksik değişkenler kırmızı işaretlenir. Skoru 100&apos;e yaklaştırmak için eksik yapılandırmaları tamamlayın.</p>} />
             </div>
-            <p className="text-sm text-muted-foreground">Security hardening &amp; production readiness</p>
+            <p className="text-sm text-muted-foreground">Güvenlik sıkılaştırma ve canlıya alım hazırlığı</p>
           </div>
         </div>
 

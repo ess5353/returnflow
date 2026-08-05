@@ -104,8 +104,8 @@ export default function BillingPage() {
 
   useEffect(() => {
     AppBridgeHelper.closeLoader();
-    loadSettings();
-  }, [loadSettings]);
+    loadSettings(token);
+  }, [loadSettings, token]);
 
   const fetchStatus = useCallback(async (t: string) => {
     setLoading(true);

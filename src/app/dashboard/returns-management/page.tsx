@@ -498,7 +498,7 @@ export default function ReturnsManagementPage() {
   useEffect(() => {
     if (token) {
       fetchRows(token).catch(() => null);
-      loadSettings().catch(() => null);
+      loadSettings(token).catch(() => null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -635,25 +635,15 @@ export default function ReturnsManagementPage() {
     setUpdatingStatus(false);
     if (!res.ok) { toast('Durum güncellenemedi', 'error'); return; }
 
-    const rType = drawerRow?.request_type ?? 'return';
-    const templateMap: Record<string, string> = {
-      Onaylandı: rType === 'exchange' ? 'exchange_approved' : 'return_approved',
-      Reddedildi: rType === 'exchange' ? 'exchange_rejected' : 'return_rejected',
-      Tamamlandı: rType === 'exchange' ? 'exchange_completed' : 'return_completed',
-    };
-    const templateType = templateMap[status];
-    if (templateType) {
-      fetch('/api/email/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
-        body: JSON.stringify({ return_id: id, template_type: templateType }),
-      }).catch(() => {});
-    }
+    // Note: the customer notification email is sent server-side by the PATCH
+    // handler above (src/app/api/returns/[id]/route.ts) for every status in
+    // emailTemplateMap — do not also send it from here, or the customer gets
+    // the same email twice.
 
     await fetchRows(token);
-    const label = status === 'Onaylandı' ? 'Talep onaylandı — müşteriye e-posta gönderildi'
-      : status === 'Reddedildi' ? 'Talep reddedildi — müşteri bilgilendirildi'
-      : status === 'Tamamlandı' ? 'Tamamlandı — müşteriye e-posta gönderildi'
+    const label = status === 'Onaylandı' ? 'Talep onaylandı'
+      : status === 'Reddedildi' ? 'Talep reddedildi'
+      : status === 'Tamamlandı' ? 'Tamamlandı olarak işaretlendi'
       : status === 'Kargo Bekleniyor' ? 'Durum güncellendi: Kargo bekleniyor'
       : status === 'Kargo Alındı' ? 'Kargo teslim alındı olarak işaretlendi'
       : status === 'İade Edildi' ? 'İade işlendi olarak işaretlendi'

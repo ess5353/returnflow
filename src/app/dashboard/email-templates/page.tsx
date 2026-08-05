@@ -65,7 +65,7 @@ export default function EmailTemplatesPage() {
       tokenRef.current = authHeader;
       loadTemplates(authHeader);
     }
-    loadSettings();
+    loadSettings(authHeader);
   }, [authHeader, loadTemplates, loadSettings]);
 
   useEffect(() => {

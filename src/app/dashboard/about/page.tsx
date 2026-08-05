@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { ArrowLeftRight, Mail, Shield, Zap, Globe } from 'lucide-react';
@@ -18,12 +19,13 @@ const FEATURES = [
 ];
 
 export default function AboutPage() {
+  const { authHeader: token } = useAuth();
   const { settings, loadSettings } = useStoreSettings();
 
   useEffect(() => {
     AppBridgeHelper.closeLoader();
-    loadSettings();
-  }, [loadSettings]);
+    loadSettings(token);
+  }, [loadSettings, token]);
 
   return (
     <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>

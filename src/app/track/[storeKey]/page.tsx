@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import type { PublicStoreSettings } from '@/app/api/store-settings/route';
 import { ArrowLeftRight, Check, Clock, ExternalLink, Hash, Package, Truck, X } from 'lucide-react';
 import { getCarrierLabel, getShippingStatusLabel, getTrackingUrl } from '@/lib/shipping/carriers';
@@ -51,11 +51,14 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${config.cls}`}>{config.label}</span>;
 }
 
-export default function TrackPage() {
+function TrackPageInner() {
   const { storeKey } = useParams<{ storeKey: string }>();
+  const searchParams = useSearchParams();
+  const rfFromUrl = searchParams.get('rf') ?? '';
+  const emailFromUrl = searchParams.get('email') ?? '';
 
-  const [trackingId, setTrackingId] = useState('');
-  const [email, setEmail] = useState('');
+  const [trackingId, setTrackingId] = useState(rfFromUrl);
+  const [email, setEmail] = useState(emailFromUrl);
   const [request, setRequest] = useState<ReturnRequest | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -92,6 +95,15 @@ export default function TrackPage() {
       setSearching(false);
     }
   };
+
+  // Auto-search when arriving with a pre-filled RF number + email (e.g. from the
+  // "Takibime Git" link right after submitting a request on the returns portal).
+  useEffect(() => {
+    if (rfFromUrl && emailFromUrl) {
+      searchRequest();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const accentColor = settings?.primary_color || '#000000';
   const isExchange = request?.request_type === 'exchange';
@@ -134,7 +146,7 @@ export default function TrackPage() {
             </div>
           )}
           <div>
-            <p className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">Return Portal</p>
+            <p className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">Müşteri Hizmetleri</p>
             <p className="text-sm font-bold leading-tight">{settings?.store_name || 'Mağaza'}</p>
           </div>
         </div>
@@ -366,5 +378,13 @@ export default function TrackPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function TrackPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f5f6fa]" />}>
+      <TrackPageInner />
+    </Suspense>
   );
 }

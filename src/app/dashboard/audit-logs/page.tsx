@@ -11,11 +11,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 type AuditAction =
   | 'return.created' | 'return.approved' | 'return.rejected' | 'return.completed'
+  | 'return.shipment_awaited' | 'return.shipment_received' | 'return.refunded'
   | 'exchange.created' | 'exchange.approved' | 'exchange.completed'
+  | 'exchange.shipment_awaited' | 'exchange.shipment_received' | 'exchange.shipped'
   | 'automation_rule.created' | 'automation_rule.updated' | 'automation_rule.deleted'
   | 'webhook.created' | 'webhook.updated' | 'webhook.deleted'
   | 'api_key.created' | 'api_key.revoked'
-  | 'email_template.updated' | 'settings.updated' | 'notification.read' | 'export.generated';
+  | 'email_template.updated' | 'settings.updated' | 'notification.read' | 'export.generated'
+  | 'member.invited' | 'member.removed' | 'member.role_changed' | 'member.permissions_updated';
 
 interface AuditLog {
   id: string;
@@ -40,9 +43,15 @@ const ACTION_LABELS: Record<string, string> = {
   'return.approved': 'İade Onaylandı',
   'return.rejected': 'İade Reddedildi',
   'return.completed': 'İade Tamamlandı',
+  'return.shipment_awaited': 'Kargo Bekleniyor',
+  'return.shipment_received': 'Kargo Alındı',
+  'return.refunded': 'İade Edildi',
   'exchange.created': 'Değişim Oluşturuldu',
   'exchange.approved': 'Değişim Onaylandı',
   'exchange.completed': 'Değişim Tamamlandı',
+  'exchange.shipment_awaited': 'Kargo Bekleniyor',
+  'exchange.shipment_received': 'Kargo Alındı',
+  'exchange.shipped': 'Yeni Ürün Kargoya Verildi',
   'automation_rule.created': 'Kural Oluşturuldu',
   'automation_rule.updated': 'Kural Güncellendi',
   'automation_rule.deleted': 'Kural Silindi',
@@ -55,13 +64,17 @@ const ACTION_LABELS: Record<string, string> = {
   'settings.updated': 'Ayarlar Güncellendi',
   'notification.read': 'Bildirim Okundu',
   'export.generated': 'Dışa Aktarma Oluşturuldu',
+  'member.invited': 'Üye Davet Edildi',
+  'member.removed': 'Üye Kaldırıldı',
+  'member.role_changed': 'Üye Rolü Değiştirildi',
+  'member.permissions_updated': 'Üye İzinleri Güncellendi',
 };
 
-const ENTITY_TYPES = ['return', 'exchange', 'automation_rule', 'webhook', 'api_key', 'email_template', 'settings', 'notification', 'export'];
+const ENTITY_TYPES = ['return', 'exchange', 'automation_rule', 'webhook', 'api_key', 'email_template', 'settings', 'notification', 'export', 'team_member'];
 const ENTITY_LABELS: Record<string, string> = {
   return: 'İade', exchange: 'Değişim', automation_rule: 'Kural', webhook: 'Webhook',
   api_key: 'API Anahtarı', email_template: 'E-posta Şablonu', settings: 'Ayarlar',
-  notification: 'Bildirim', export: 'Dışa Aktarma',
+  notification: 'Bildirim', export: 'Dışa Aktarma', team_member: 'Takım Üyesi',
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -69,9 +82,15 @@ const ACTION_COLORS: Record<string, string> = {
   'return.approved': 'bg-green-100 text-green-800',
   'return.rejected': 'bg-red-100 text-red-800',
   'return.completed': 'bg-emerald-100 text-emerald-800',
+  'return.shipment_awaited': 'bg-blue-100 text-blue-800',
+  'return.shipment_received': 'bg-blue-100 text-blue-800',
+  'return.refunded': 'bg-violet-100 text-violet-800',
   'exchange.created': 'bg-purple-100 text-purple-800',
   'exchange.approved': 'bg-green-100 text-green-800',
   'exchange.completed': 'bg-emerald-100 text-emerald-800',
+  'exchange.shipment_awaited': 'bg-blue-100 text-blue-800',
+  'exchange.shipment_received': 'bg-blue-100 text-blue-800',
+  'exchange.shipped': 'bg-indigo-100 text-indigo-800',
   'automation_rule.created': 'bg-yellow-100 text-yellow-800',
   'automation_rule.updated': 'bg-yellow-100 text-yellow-800',
   'automation_rule.deleted': 'bg-red-100 text-red-800',
@@ -84,6 +103,10 @@ const ACTION_COLORS: Record<string, string> = {
   'settings.updated': 'bg-gray-100 text-gray-800',
   'notification.read': 'bg-gray-100 text-gray-700',
   'export.generated': 'bg-teal-100 text-teal-800',
+  'member.invited': 'bg-cyan-100 text-cyan-800',
+  'member.removed': 'bg-red-100 text-red-800',
+  'member.role_changed': 'bg-yellow-100 text-yellow-800',
+  'member.permissions_updated': 'bg-yellow-100 text-yellow-800',
 };
 
 function formatDate(iso: string) {

@@ -312,7 +312,7 @@ export default function ApiKeysPage() {
     else setLoading(false);
   }, [fetchKeys]);
 
-  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(); }, [loadSettings]);
+  useEffect(() => { AppBridgeHelper.closeLoader(); loadSettings(token); }, [loadSettings, token]);
   useEffect(() => { init(); }, [init]);
 
   async function handleRevoke(id: string) {

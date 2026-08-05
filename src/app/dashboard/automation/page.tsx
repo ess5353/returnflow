@@ -701,7 +701,7 @@ export default function AutomationPage() {
   useEffect(() => {
     if (token) {
       Promise.all([fetchRules(token), fetchStats(token)]).catch(() => null);
-      loadSettings().catch(() => null);
+      loadSettings(token).catch(() => null);
     } else {
       setLoading(false);
     }

@@ -97,7 +97,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (token) {
-      Promise.all([fetchRequests(token), fetchOrders(token), fetchSettings()]).catch(() => null);
+      Promise.all([fetchRequests(token), fetchOrders(token), fetchSettings(token)]).catch(() => null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -200,7 +200,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
-      <OnboardingWizard />
+      <OnboardingWizard storeKey={settings?.store_key} />
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -214,7 +214,7 @@ export default function DashboardPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { if (token) { setLoading(true); fetchRequests(token); fetchOrders(token); } fetchSettings(); }}
+            onClick={() => { if (token) { setLoading(true); fetchRequests(token); fetchOrders(token); } fetchSettings(token); }}
             className="shrink-0 gap-2"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -249,7 +249,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Onboarding checklist — shown until all steps done */}
-        {!loading && <OnboardingChecklist />}
+        {!loading && <OnboardingChecklist storeKey={settings?.store_key} />}
 
         {/* Portal link */}
         {settings?.store_key && (() => {

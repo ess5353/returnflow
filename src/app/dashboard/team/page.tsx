@@ -114,6 +114,9 @@ function InviteModal({
             <Dialog.Title className="text-base font-semibold">Üye Davet Et</Dialog.Title>
             <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
           </div>
+          <Dialog.Description className="text-xs text-muted-foreground">
+            Ekibinize e-posta ile davet gönderin ve rol tabanlı erişim tanımlayın.
+          </Dialog.Description>
 
           <div className="space-y-3">
             <div>
@@ -215,9 +218,9 @@ function PermissionsModal({
             <button onClick={onClose}><X className="h-4 w-4 text-muted-foreground" /></button>
           </div>
 
-          <p className="text-xs text-muted-foreground">
+          <Dialog.Description className="text-xs text-muted-foreground">
             Rol: <span className="font-medium">{ROLE_LABELS[member.role]}</span>. Ek izinler seçerek genişletebilirsiniz.
-          </p>
+          </Dialog.Description>
 
           <div className="space-y-1">
             {ALL_PERMISSIONS.map((p) => {
@@ -416,7 +419,7 @@ export default function TeamPage() {
   useEffect(() => {
     if (authHeader) {
       fetchMembers(authHeader);
-      loadSettings();
+      loadSettings(authHeader);
     }
   }, [authHeader, fetchMembers, loadSettings]);
 

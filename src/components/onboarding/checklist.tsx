@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Check, ChevronDown, ChevronUp, Circle } from 'lucide-react';
 import Link from 'next/link';
@@ -15,12 +15,13 @@ interface ChecklistItem {
   linkLabel: string;
 }
 
-const ITEMS: ChecklistItem[] = [
+function buildItems(storeKey?: string | null): ChecklistItem[] {
+  return [
   {
     id: 'portal_link',
     label: 'Müşteri portal linkini paylaş',
     desc: 'Sipariş e-postalarına veya sitenize ekleyin.',
-    href: `${process.env.NEXT_PUBLIC_DEPLOY_URL ?? ''}/returns`,
+    href: storeKey ? `${process.env.NEXT_PUBLIC_DEPLOY_URL ?? ''}/returns/${storeKey}` : '/dashboard/settings',
     linkLabel: 'Portala Git',
   },
   {
@@ -51,12 +52,13 @@ const ITEMS: ChecklistItem[] = [
     href: '/dashboard/team',
     linkLabel: 'Takıma Git',
   },
-];
+  ];
+}
 
-function useChecklist() {
+function useChecklist(items: ChecklistItem[]) {
   const [checked, setChecked] = useState<Record<string, boolean>>(() => {
     if (typeof window === 'undefined') return {};
-    return ITEMS.reduce<Record<string, boolean>>((acc, item) => {
+    return items.reduce<Record<string, boolean>>((acc, item) => {
       acc[item.id] = localStorage.getItem(`${STORAGE_PREFIX}${item.id}`) === '1';
       return acc;
     }, {});
@@ -75,8 +77,9 @@ function useChecklist() {
   return { checked, toggle };
 }
 
-export function OnboardingChecklist() {
-  const { checked, toggle } = useChecklist();
+export function OnboardingChecklist({ storeKey }: { storeKey?: string | null }) {
+  const ITEMS = useMemo(() => buildItems(storeKey), [storeKey]);
+  const { checked, toggle } = useChecklist(ITEMS);
   const [collapsed, setCollapsed] = useState(false);
 
   const done = Object.values(checked).filter(Boolean).length;

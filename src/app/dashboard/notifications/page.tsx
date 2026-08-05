@@ -53,8 +53,8 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     AppBridgeHelper.closeLoader();
-    loadSettings();
-  }, [loadSettings]);
+    loadSettings(token);
+  }, [loadSettings, token]);
 
   useEffect(() => {
     if (token) fetchNotifications(token, page, typeFilter);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AppBridgeHelper } from '@ikas/app-helpers';
+import { useAuth } from '@/hooks/use-auth';
 import { useStoreSettings } from '@/app/hooks/use-store-settings';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { cn } from '@/lib/utils';
@@ -467,13 +468,14 @@ function ModuleItem({ mod, isOpen, onToggle }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function HelpPage() {
+  const { authHeader: token } = useAuth();
   const { settings, loadSettings } = useStoreSettings();
   const [openId, setOpenId] = useState<string | null>('overview');
 
   useEffect(() => {
     AppBridgeHelper.closeLoader();
-    loadSettings();
-  }, [loadSettings]);
+    loadSettings(token);
+  }, [loadSettings, token]);
 
   function toggle(id: string) {
     setOpenId((cur) => (cur === id ? null : id));

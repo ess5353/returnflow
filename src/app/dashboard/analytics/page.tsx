@@ -188,8 +188,8 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+    loadSettings(token);
+  }, [loadSettings, token]);
 
   const loadData = useCallback(async (t: string) => {
     const res = await fetch('/api/returns', { headers: { Authorization: t } });

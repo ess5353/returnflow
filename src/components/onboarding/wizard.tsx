@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { ArrowLeftRight, ArrowRight, Check, Copy, Globe, Mail, Zap } from 'lucide-react';
@@ -9,8 +9,6 @@ import { toast } from '@/components/ui/toast';
 
 const STORAGE_KEY = 'pelyx_onboarding_done';
 
-const PORTAL_URL = `${process.env.NEXT_PUBLIC_DEPLOY_URL ?? ''}/returns`;
-
 interface Step {
   icon: React.ElementType;
   title: string;
@@ -18,43 +16,53 @@ interface Step {
   action?: React.ReactNode;
 }
 
-const STEPS: Step[] = [
-  {
-    icon: ArrowLeftRight,
-    title: "ReturnFlow'a Hoş Geldiniz",
-    desc: 'Mağazanızın iade ve değişim süreçlerini kolaylaştırmak için buradayız. Bu kısa kurulum sihirbazı sizi 3 adımda hazır hale getirecek.',
-  },
-  {
-    icon: Globe,
-    title: 'Müşteri Portal Linkinizi Paylaşın',
-    desc: 'Müşterileriniz bu link üzerinden iade veya değişim talebinde bulunabilir. Linki sipariş onay e-postalarınıza veya web sitenize ekleyin.',
-    action: (
-      <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-muted p-3">
-        <code className="flex-1 truncate text-xs text-muted-foreground">{PORTAL_URL}</code>
-        <button
-          onClick={() => { navigator.clipboard.writeText(PORTAL_URL); toast('Portal linki kopyalandı', 'success'); }}
-          className="shrink-0 rounded-md p-1.5 hover:bg-muted-foreground/10 transition-colors"
-        >
-          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
-      </div>
-    ),
-  },
-  {
-    icon: Mail,
-    title: 'E-posta Bildirimlerini Ayarlayın',
-    desc: 'Yeni iade talebi geldiğinde e-posta almak için Ayarlar sayfasından bildirim e-postanızı ekleyin.',
-  },
-  {
-    icon: Zap,
-    title: 'Otomasyon Kuralı Oluşturun (İsteğe Bağlı)',
-    desc: 'Belirli koşullara göre talepleri otomatik onaylayan, reddeden veya etiketleyen kurallar tanımlayabilirsiniz. Otomasyon sayfasından başlayın.',
-  },
-];
+function buildSteps(portalUrl: string | null): Step[] {
+  return [
+    {
+      icon: ArrowLeftRight,
+      title: "ReturnFlow'a Hoş Geldiniz",
+      desc: 'Mağazanızın iade ve değişim süreçlerini kolaylaştırmak için buradayız. Bu kısa kurulum sihirbazı sizi 3 adımda hazır hale getirecek.',
+    },
+    {
+      icon: Globe,
+      title: 'Müşteri Portal Linkinizi Paylaşın',
+      desc: 'Müşterileriniz bu link üzerinden iade veya değişim talebinde bulunabilir. Linki sipariş onay e-postalarınıza veya web sitenize ekleyin.',
+      action: portalUrl ? (
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-muted p-3">
+          <code className="flex-1 truncate text-xs text-muted-foreground">{portalUrl}</code>
+          <button
+            onClick={() => { navigator.clipboard.writeText(portalUrl); toast('Portal linki kopyalandı', 'success'); }}
+            className="shrink-0 rounded-md p-1.5 hover:bg-muted-foreground/10 transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-lg border border-border bg-muted p-3 text-xs text-muted-foreground">
+          Portal linkiniz yükleniyor — Ayarlar sayfasından da kopyalayabilirsiniz.
+        </div>
+      ),
+    },
+    {
+      icon: Mail,
+      title: 'E-posta Bildirimlerini Ayarlayın',
+      desc: 'Yeni iade talebi geldiğinde e-posta almak için Ayarlar sayfasından bildirim e-postanızı ekleyin.',
+    },
+    {
+      icon: Zap,
+      title: 'Otomasyon Kuralı Oluşturun (İsteğe Bağlı)',
+      desc: 'Belirli koşullara göre talepleri otomatik onaylayan, reddeden veya etiketleyen kurallar tanımlayabilirsiniz. Otomasyon sayfasından başlayın.',
+    },
+  ];
+}
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ storeKey }: { storeKey?: string | null }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
+  const STEPS = useMemo(
+    () => buildSteps(storeKey ? `${process.env.NEXT_PUBLIC_DEPLOY_URL ?? ''}/returns/${storeKey}` : null),
+    [storeKey],
+  );
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !localStorage.getItem(STORAGE_KEY)) {
