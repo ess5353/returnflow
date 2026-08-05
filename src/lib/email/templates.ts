@@ -1,8 +1,15 @@
 export type TemplateType =
+  | 'return_received'
+  | 'exchange_received'
   | 'return_approved'
   | 'return_rejected'
   | 'exchange_approved'
   | 'exchange_rejected'
+  | 'return_shipment_awaited'
+  | 'exchange_shipment_awaited'
+  | 'return_shipment_received'
+  | 'exchange_shipment_received'
+  | 'return_refunded'
   | 'return_completed'
   | 'exchange_completed';
 
@@ -13,6 +20,16 @@ export interface TemplateMeta {
 }
 
 export const TEMPLATE_META: Record<TemplateType, TemplateMeta> = {
+  return_received: {
+    label: 'İade Talebi Alındı',
+    description: 'Müşteri iade talebini oluşturduğunda gönderilen onay e-postası.',
+    defaultSubject: 'İade Talebiniz Alındı — {{rf_number}}',
+  },
+  exchange_received: {
+    label: 'Değişim Talebi Alındı',
+    description: 'Müşteri değişim talebini oluşturduğunda gönderilen onay e-postası.',
+    defaultSubject: 'Değişim Talebiniz Alındı — {{rf_number}}',
+  },
   return_approved: {
     label: 'İade Onaylandı',
     description: 'Müşterinin iade talebi onaylandığında gönderilir.',
@@ -33,9 +50,34 @@ export const TEMPLATE_META: Record<TemplateType, TemplateMeta> = {
     description: 'Müşterinin değişim talebi reddedildiğinde gönderilir.',
     defaultSubject: 'Değişim Talebiniz Hakkında — {{rf_number}}',
   },
+  return_shipment_awaited: {
+    label: 'İade — Kargo Bekleniyor',
+    description: 'Müşterinin iade kargo göndermesi beklendiğinde gönderilir.',
+    defaultSubject: 'İadenizi Gönderin — {{rf_number}}',
+  },
+  exchange_shipment_awaited: {
+    label: 'Değişim — Kargo Bekleniyor',
+    description: 'Değişim için müşterinin kargo göndermesi beklendiğinde gönderilir.',
+    defaultSubject: 'Değişim Ürününü Gönderin — {{rf_number}}',
+  },
+  return_shipment_received: {
+    label: 'İade — Kargo Alındı',
+    description: 'Müşterinin iade kargosu teslim alındığında gönderilir.',
+    defaultSubject: 'İade Kargonuz Alındı — {{rf_number}}',
+  },
+  exchange_shipment_received: {
+    label: 'Değişim — Kargo Alındı',
+    description: 'Değişim için müşterinin kargosu teslim alındığında gönderilir.',
+    defaultSubject: 'Değişim Kargonuz Alındı — {{rf_number}}',
+  },
+  return_refunded: {
+    label: 'Para İadesi Yapıldı',
+    description: 'Para iadesi işleme alındığında gönderilir.',
+    defaultSubject: 'Para İadeniz İşlemde — {{rf_number}}',
+  },
   return_completed: {
     label: 'İade Tamamlandı',
-    description: 'İade işlemi tamamlandığında (para iadesi yapıldığında) gönderilir.',
+    description: 'İade işlemi tamamlandığında gönderilir.',
     defaultSubject: 'İade İşleminiz Tamamlandı — {{rf_number}}',
   },
   exchange_completed: {
@@ -137,6 +179,12 @@ function layout(opts: {
 </html>`;
 }
 
+const receivedBody = `
+    <div style="padding:20px 32px 8px;">
+      ${section('Sonraki Adım', '<p style="font-size:13px;color:#374151;margin:0;line-height:1.65;">Talebinizi en kısa sürede inceleyeceğiz. Durum değişikliklerinde e-posta ile bilgilendirileceksiniz.</p>')}
+      {{#if contact_phone}}${section('İletişim', '<p style="font-size:13px;font-weight:600;color:#111;margin:0;">{{contact_phone}}</p>')}{{/if}}
+    </div>`;
+
 const approvedBody = `
     <div style="padding:20px 32px 8px;">
       {{#if return_address}}${section('İade Adresi', '<p style="font-size:13px;color:#374151;margin:0;line-height:1.65;white-space:pre-line;">{{return_address}}</p>')}{{/if}}
@@ -156,7 +204,41 @@ const completedBody = `
       {{#if contact_phone}}${section('İletişim', '<p style="font-size:13px;font-weight:600;color:#111;margin:0;">{{contact_phone}}</p>')}{{/if}}
     </div>`;
 
+const shipmentAwaitedBody = `
+    <div style="padding:20px 32px 8px;">
+      {{#if return_address}}${section('Göndereceğiniz Adres', '<p style="font-size:13px;color:#374151;margin:0;line-height:1.65;white-space:pre-line;">{{return_address}}</p>')}{{/if}}
+      {{#if return_instructions}}${section('Nasıl Gönderirsiniz?', '<p style="font-size:13px;color:#374151;margin:0;line-height:1.7;white-space:pre-line;">{{return_instructions}}</p>')}{{/if}}
+      {{#if return_deadline}}<div style="margin:0 0 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;"><p style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 4px;">Son Gönderim Tarihi</p><p style="font-size:15px;font-weight:700;color:#78350f;margin:0;">{{return_deadline}}</p></div>{{/if}}
+      {{#if contact_phone}}${section('İletişim', '<p style="font-size:13px;font-weight:600;color:#111;margin:0;">{{contact_phone}}</p>')}{{/if}}
+    </div>`;
+
+const shipmentReceivedBody = `
+    <div style="padding:20px 32px 8px;">
+      ${section('Durum', '<p style="font-size:13px;color:#374151;margin:0;line-height:1.65;">Gönderdiğiniz kargoyu teslim aldık. İnceleme tamamlandıktan sonra bilgilendirileceksiniz.</p>')}
+      {{#if contact_phone}}${section('İletişim', '<p style="font-size:13px;font-weight:600;color:#111;margin:0;">{{contact_phone}}</p>')}{{/if}}
+    </div>`;
+
+const refundedBody = `
+    <div style="padding:20px 32px 8px;">
+      ${section('Para İadesi', '<p style="font-size:13px;color:#374151;margin:0;line-height:1.65;">Para iadeniz işleme alındı. Bankanıza veya ödeme yönteminize bağlı olarak 3-10 iş günü içinde hesabınıza yansır.</p>')}
+      {{#if contact_phone}}${section('İletişim', '<p style="font-size:13px;font-weight:600;color:#111;margin:0;">{{contact_phone}}</p>')}{{/if}}
+    </div>`;
+
 export const DEFAULT_TEMPLATES: Record<TemplateType, string> = {
+  return_received: layout({
+    badge: '📬 Talebiniz Alındı',
+    badgeBg: '#f0f9ff', badgeBorder: '#bae6fd', badgeColor: '#0369a1',
+    headline: 'Merhaba, {{customer_name}}!',
+    subline: '{{store_name}} iade talebinizi aldı. En kısa sürede inceleme yapılacaktır.',
+    bodyHtml: receivedBody,
+  }),
+  exchange_received: layout({
+    badge: '📬 Talebiniz Alındı',
+    badgeBg: '#f0f9ff', badgeBorder: '#bae6fd', badgeColor: '#0369a1',
+    headline: 'Merhaba, {{customer_name}}!',
+    subline: '{{store_name}} değişim talebinizi aldı. En kısa sürede inceleme yapılacaktır.',
+    bodyHtml: receivedBody,
+  }),
   return_approved: layout({
     badge: '✓ İadeniz Onaylandı',
     badgeBg: '#f0fdf4', badgeBorder: '#bbf7d0', badgeColor: '#15803d',
@@ -184,6 +266,41 @@ export const DEFAULT_TEMPLATES: Record<TemplateType, string> = {
     headline: 'Merhaba, {{customer_name}}!',
     subline: 'Maalesef {{store_name}} bu değişim talebini onaylayamadı.',
     bodyHtml: rejectedBody,
+  }),
+  return_shipment_awaited: layout({
+    badge: '📦 Kargo Bekleniyor',
+    badgeBg: '#fefce8', badgeBorder: '#fde68a', badgeColor: '#854d0e',
+    headline: 'Merhaba, {{customer_name}}!',
+    subline: 'İade talebiniz onaylandı. Lütfen ürününüzü aşağıdaki adrese gönderin.',
+    bodyHtml: shipmentAwaitedBody,
+  }),
+  exchange_shipment_awaited: layout({
+    badge: '📦 Kargo Bekleniyor',
+    badgeBg: '#fefce8', badgeBorder: '#fde68a', badgeColor: '#854d0e',
+    headline: 'Merhaba, {{customer_name}}!',
+    subline: 'Değişim talebiniz onaylandı. Lütfen ürününüzü aşağıdaki adrese gönderin.',
+    bodyHtml: shipmentAwaitedBody,
+  }),
+  return_shipment_received: layout({
+    badge: '✓ Kargo Teslim Alındı',
+    badgeBg: '#f0fdf4', badgeBorder: '#bbf7d0', badgeColor: '#15803d',
+    headline: 'Merhaba, {{customer_name}}!',
+    subline: '{{store_name}} iade kargonuzu teslim aldı. İnceleme sürecindeyiz.',
+    bodyHtml: shipmentReceivedBody,
+  }),
+  exchange_shipment_received: layout({
+    badge: '✓ Kargo Teslim Alındı',
+    badgeBg: '#f0fdf4', badgeBorder: '#bbf7d0', badgeColor: '#15803d',
+    headline: 'Merhaba, {{customer_name}}!',
+    subline: '{{store_name}} değişim kargonuzu teslim aldı. İşlem sürecindeyiz.',
+    bodyHtml: shipmentReceivedBody,
+  }),
+  return_refunded: layout({
+    badge: '💳 Para İadesi Yapıldı',
+    badgeBg: '#f5f3ff', badgeBorder: '#ddd6fe', badgeColor: '#6d28d9',
+    headline: 'Merhaba, {{customer_name}}!',
+    subline: 'İade tutarınız hesabınıza aktarılmaktadır.',
+    bodyHtml: refundedBody,
   }),
   return_completed: layout({
     badge: '✓ İade Tamamlandı',

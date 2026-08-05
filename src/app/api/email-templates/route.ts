@@ -5,8 +5,13 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { DEFAULT_TEMPLATES, TEMPLATE_META, type TemplateType } from '@/lib/email/templates';
 
 const ALL_TYPES: TemplateType[] = [
-  'return_approved', 'return_rejected', 'exchange_approved',
-  'exchange_rejected', 'return_completed', 'exchange_completed',
+  'return_received', 'exchange_received',
+  'return_approved', 'return_rejected',
+  'exchange_approved', 'exchange_rejected',
+  'return_shipment_awaited', 'exchange_shipment_awaited',
+  'return_shipment_received', 'exchange_shipment_received',
+  'return_refunded',
+  'return_completed', 'exchange_completed',
 ];
 
 export async function GET(request: NextRequest) {

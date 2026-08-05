@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { resolveStoreKey } from '@/lib/store/resolve';
+import { sendReturnEmail } from '@/lib/email/send';
 import { createNotification } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import { createAuditLog } from '@/lib/audit/log';
@@ -196,6 +197,13 @@ export async function POST(request: NextRequest) {
     status: 'Yeni Talep',
     request_type: rType,
     amount: String(amount),
+  }).catch(() => undefined);
+
+  // Fire-and-forget: customer confirmation email
+  sendReturnEmail({
+    merchantId: merchant_id,
+    returnId: inserted.id,
+    templateType: rType === 'exchange' ? 'exchange_received' : 'return_received',
   }).catch(() => undefined);
 
   // Fire-and-forget: run automation rules server-side

@@ -6,6 +6,8 @@ import { createNotification, type NotificationType } from '@/lib/notifications/c
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import type { WebhookEvent } from '@/lib/webhooks/events';
 import { createAuditLog, getIp, type AuditAction } from '@/lib/audit/log';
+import { sendReturnEmail } from '@/lib/email/send';
+import type { TemplateType } from '@/lib/email/templates';
 
 const NOTIFIABLE_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Kargo Bekleniyor', 'Kargo Alındı', 'İade Edildi', 'Tamamlandı']);
 
@@ -138,6 +140,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             entityId: id,
             metadata: { rf_number: data.rf_number, status: newStatus },
           });
+        }
+
+        // Customer email — fire-and-forget
+        const emailTemplateMap: Record<string, TemplateType> = {
+          'Onaylandı': isExchange ? 'exchange_approved' : 'return_approved',
+          'Reddedildi': isExchange ? 'exchange_rejected' : 'return_rejected',
+          'Kargo Bekleniyor': isExchange ? 'exchange_shipment_awaited' : 'return_shipment_awaited',
+          'Kargo Alındı': isExchange ? 'exchange_shipment_received' : 'return_shipment_received',
+          'İade Edildi': 'return_refunded',
+          'Tamamlandı': isExchange ? 'exchange_completed' : 'return_completed',
+        };
+        const emailTemplate = emailTemplateMap[newStatus];
+        if (emailTemplate) {
+          sendReturnEmail({ merchantId: user.merchantId, returnId: id, templateType: emailTemplate }).catch(() => undefined);
         }
       });
   }
