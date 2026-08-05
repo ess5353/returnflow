@@ -1,7 +1,6 @@
-import { NextResponse } from 'next/server';
-import { AuthTokenManager } from '@/models/auth-token/manager';
-import { getIkas } from '@/helpers/api-helpers';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { resolveStoreKey } from '@/lib/store/resolve';
 
 export type PublicStoreSettings = {
   merchant_id: string;
@@ -15,51 +14,39 @@ export type PublicStoreSettings = {
   contact_phone: string | null;
 };
 
-export async function GET() {
-  try {
-    const tokens = await AuthTokenManager.list();
-    const authToken = tokens.find((t) => !t.deleted);
+export async function GET(request: NextRequest) {
+  const storeKey = new URL(request.url).searchParams.get('storeKey')?.trim();
+  if (!storeKey) {
+    return NextResponse.json({ error: 'storeKey is required' }, { status: 400 });
+  }
 
-    if (!authToken) {
-      return NextResponse.json({ error: 'No auth token' }, { status: 404 });
-    }
+  const merchantId = await resolveStoreKey(storeKey);
+  if (!merchantId) {
+    return NextResponse.json({ error: 'Store not found' }, { status: 404 });
+  }
 
-    const ikas = getIkas(authToken);
-    const merchantResponse = await ikas.queries.getMerchant();
-    const merchantId = merchantResponse.data?.getMerchant?.id;
+  const { data, error } = await supabaseAdmin
+    .from('store_settings')
+    .select('merchant_id, store_name, logo_url, primary_color, support_email, return_policy, operation_mode, return_instructions, contact_phone')
+    .eq('merchant_id', merchantId)
+    .maybeSingle();
 
-    if (!merchantId) {
-      return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('store_settings')
-      .select('merchant_id, store_name, logo_url, primary_color, support_email, return_policy, operation_mode, return_instructions, contact_phone')
-      .eq('merchant_id', merchantId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('store_settings sorgusu başarısız:', error);
-      return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 });
-    }
-
-    // Always return merchant_id even when no settings row exists yet.
-    // This ensures the customer portal can always submit returns correctly.
-    const settings: PublicStoreSettings = data ?? {
-      merchant_id: merchantId,
-      store_name: null,
-      logo_url: null,
-      primary_color: null,
-      support_email: null,
-      return_policy: null,
-      operation_mode: null,
-      return_instructions: null,
-      contact_phone: null,
-    };
-
-    return NextResponse.json({ data: settings });
-  } catch (err) {
-    console.error('store-settings hatası:', err);
+  if (error) {
+    console.error('store_settings sorgusu başarısız:', error);
     return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 });
   }
+
+  const settings: PublicStoreSettings = data ?? {
+    merchant_id: merchantId,
+    store_name: null,
+    logo_url: null,
+    primary_color: null,
+    support_email: null,
+    return_policy: null,
+    operation_mode: null,
+    return_instructions: null,
+    contact_phone: null,
+  };
+
+  return NextResponse.json({ data: settings });
 }

@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
-import { Upload } from 'lucide-react';
+import { Copy, Upload } from 'lucide-react';
 import { PageHelp } from '@/components/ui/page-help';
 
 function FieldHint({ children }: { children: React.ReactNode }) {
@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const [returnDeadlineDays, setReturnDeadlineDays] = useState('');
   const [returnPolicy, setReturnPolicy] = useState('');
   const [operationMode, setOperationMode] = useState<'both' | 'return_only' | 'exchange_only'>('both');
+  const [storeKey, setStoreKey] = useState('');
 
   const loadSettings = useCallback(async (t: string) => {
     try {
@@ -52,6 +53,7 @@ export default function SettingsPage() {
         setReturnInstructions(d.return_instructions || '');
         setReturnDeadlineDays(d.return_deadline_days != null ? String(d.return_deadline_days) : '');
         setReturnPolicy(d.return_policy || '');
+        setStoreKey(d.store_key || '');
         const mode = d.operation_mode;
         setOperationMode(mode === 'return_only' || mode === 'exchange_only' ? mode : 'both');
       }
@@ -427,6 +429,40 @@ export default function SettingsPage() {
                 })}
               </div>
             </section>
+
+            {/* ── Portal Bağlantıları ───────────────────────────────────── */}
+            {storeKey && (
+              <section>
+                <h2 className="text-sm font-semibold border-b border-border pb-2 mb-5">Portal Bağlantıları</h2>
+                <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+                  Müşterilerinizin iade ve takip sayfalarına erişmesi için bu bağlantıları mağaza sitenize ekleyin.
+                </p>
+                <div className="space-y-3">
+                  {[
+                    { label: 'İade Portalı', path: `/returns/${storeKey}` },
+                    { label: 'Talep Takibi', path: `/track/${storeKey}` },
+                  ].map(({ label, path }) => {
+                    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path;
+                    return (
+                      <div key={path} className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-foreground mb-0.5">{label}</p>
+                          <p className="font-mono text-xs text-muted-foreground truncate">{fullUrl}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { navigator.clipboard.writeText(fullUrl).then(() => toast(`${label} bağlantısı kopyalandı`, 'success')); }}
+                          className="shrink-0 rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted transition-colors"
+                          title="Kopyala"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             <Button onClick={saveSettings} disabled={saving} className="w-full" size="lg">
               {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}

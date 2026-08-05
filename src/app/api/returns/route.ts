@@ -3,9 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { Resend } from 'resend';
 import { getAuthContext } from '@/lib/auth/context';
-import { AuthTokenManager } from '@/models/auth-token/manager';
-import { getIkas } from '@/helpers/api-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { resolveStoreKey } from '@/lib/store/resolve';
 import { createNotification } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import { createAuditLog } from '@/lib/audit/log';
@@ -14,6 +13,7 @@ import { getBillingEntitlement } from '@/lib/billing/entitlement';
 import { evaluateAndApplyAutomation } from '@/lib/automation/evaluate';
 
 const returnSchema = z.object({
+  store_key:       z.string().min(1).max(100),
   order_id:        z.string().min(1).max(100),
   customer_name:   z.string().min(1).max(200),
   customer_email:  z.string().email().max(254).optional(),
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
   }
 
   const {
+    store_key,
     order_id, customer_name, customer_email, product, products,
     reason, description, amount, media_urls,
     request_type, exchange_type, exchange_variant,
@@ -82,24 +83,10 @@ export async function POST(request: NextRequest) {
 
   const rType = request_type ?? 'return';
 
-  // Derive merchant_id server-side from the stored auth token — never trust the client.
-  const tokens = await AuthTokenManager.list();
-  const activeToken = tokens.find((t) => !t.deleted);
-
-  if (!activeToken) {
-    return NextResponse.json({ error: 'Store not configured' }, { status: 503 });
-  }
-
-  let merchant_id: string = activeToken.merchantId ?? '';
+  // Resolve merchant_id from store_key — never trust a client-supplied merchant_id.
+  const merchant_id = await resolveStoreKey(store_key);
   if (!merchant_id) {
-    const ikas = getIkas(activeToken);
-    const merchantResponse = await ikas.queries.getMerchant();
-    merchant_id = merchantResponse.data?.getMerchant?.id ?? '';
-  }
-
-  if (!merchant_id) {
-    console.error('returns POST: merchant_id could not be resolved');
-    return NextResponse.json({ error: 'Merchant not found' }, { status: 500 });
+    return NextResponse.json({ error: 'Store not found' }, { status: 404 });
   }
 
   // Compute startOfDay before parallel queries (synchronous)

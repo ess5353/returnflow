@@ -81,6 +81,20 @@ export class AuthTokenManager {
     if (error) throw error;
   }
 
+ static async getByMerchantId(merchantId: string): Promise<AuthToken | undefined> {
+  const { data, error } = await supabaseAdmin
+    .from('auth_tokens')
+    .select('*')
+    .eq('merchant_id', merchantId)
+    .eq('deleted', false)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return undefined;
+  return this.toModel(data);
+}
+
  static async list(): Promise<AuthToken[]> {
   const result = await supabaseAdmin.from('auth_tokens').select('*');
 

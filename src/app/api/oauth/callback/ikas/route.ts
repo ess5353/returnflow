@@ -2,6 +2,7 @@ import { config } from '@/globals/config';
 import { getSession, setSession } from '@/lib/session';
 import { createTrialBillingRecord } from '@/lib/billing/sync';
 import { validateRequest } from '@/lib/validation';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { OAuthAPI } from '@ikas/admin-api-client';
 import moment from 'moment';
 import { getIkas, getRedirectUri } from '@/helpers/api-helpers';
@@ -133,6 +134,32 @@ export async function GET(request: NextRequest) {
       await createTrialBillingRecord(merchantId);
     } catch (e) {
       console.error('OAuth callback: failed to create billing record:', e);
+    }
+
+    // Ensure store_settings row exists with a stable store_key for the public portal.
+    try {
+      const rawStoreName = String(merchantResponse.data.getMerchant.storeName ?? '');
+      const slugBase = rawStoreName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 20) || 'store';
+      const suffix = merchantId.replace(/-/g, '').slice(-10).toLowerCase();
+      const storeKey = `${slugBase}-${suffix}`;
+
+      // Insert if no row exists; do nothing on conflict (preserve existing store_key).
+      await supabaseAdmin
+        .from('store_settings')
+        .upsert({ merchant_id: merchantId, store_key: storeKey }, { onConflict: 'merchant_id', ignoreDuplicates: true });
+
+      // Also patch store_key if row exists but store_key was never set (migration edge case).
+      await supabaseAdmin
+        .from('store_settings')
+        .update({ store_key: storeKey })
+        .eq('merchant_id', merchantId)
+        .is('store_key', null);
+    } catch (e) {
+      console.error('OAuth callback: failed to upsert store_settings store_key:', e);
     }
 
 

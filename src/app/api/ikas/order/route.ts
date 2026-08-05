@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveStoreKey } from '@/lib/store/resolve';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
 
 export async function GET(request: NextRequest) {
   try {
-    const orderNo = request.nextUrl.searchParams.get('orderNo');
-    const email = request.nextUrl.searchParams.get('email');
+    const { searchParams } = request.nextUrl;
+    const orderNo = searchParams.get('orderNo');
+    const email = searchParams.get('email');
+    const storeKey = searchParams.get('storeKey')?.trim();
 
     if (!orderNo) {
       return NextResponse.json({ success: false, error: 'Order no required' }, { status: 400 });
     }
+    if (!storeKey) {
+      return NextResponse.json({ success: false, error: 'storeKey required' }, { status: 400 });
+    }
 
-    const tokens = await AuthTokenManager.list();
-    const authToken = tokens.find((t) => !t.deleted);
+    const merchantId = await resolveStoreKey(storeKey);
+    if (!merchantId) {
+      return NextResponse.json({ success: false, error: 'Store not found' }, { status: 404 });
+    }
 
+    const authToken = await AuthTokenManager.getByMerchantId(merchantId);
     if (!authToken) {
       return NextResponse.json({ success: false, error: 'Token not found' }, { status: 404 });
     }
@@ -57,7 +66,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, order });
   } catch (e) {
     console.error(e);
-
     return NextResponse.json({ success: false, error: 'Failed' }, { status: 500 });
   }
 }
