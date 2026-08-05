@@ -29,6 +29,7 @@ const PLAN_BADGE: Record<Plan, string> = {
 function TrialCountdown({ endsAt }: { endsAt: string }) {
   const TRIAL_DAYS = 14;
   const endsAtMs = new Date(endsAt).getTime();
+  const startsAtMs = endsAtMs - TRIAL_DAYS * 86400000;
   const totalMs = TRIAL_DAYS * 86400000;
 
   const [now, setNow] = useState(() => Date.now());
@@ -44,38 +45,56 @@ function TrialCountdown({ endsAt }: { endsAt: string }) {
 
   const daysLeft = Math.floor(remainingMs / 86400000);
   const hoursLeft = Math.floor((remainingMs % 86400000) / 3600000);
+  const isOver = remainingMs === 0;
   const urgent = daysLeft <= 3;
 
-  const timeLabel =
-    remainingMs === 0 ? 'Deneme süresi sona erdi'
-    : daysLeft === 0 ? `${hoursLeft} saat kaldı`
-    : daysLeft <= 3 ? `${daysLeft} gün ${hoursLeft} saat kaldı`
-    : `${daysLeft} gün kaldı`;
+  const fmt = (ms: number) =>
+    new Date(ms).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const statusText = isOver
+    ? 'Deneme süreniz sona erdi.'
+    : daysLeft === 0
+    ? `Deneme sürenizin bitmesine ${hoursLeft} saat kaldı.`
+    : daysLeft <= 3
+    ? `Deneme sürenizin bitmesine ${daysLeft} gün ${hoursLeft} saat kaldı.`
+    : `Deneme sürenizin bitmesine ${daysLeft} gün ${hoursLeft} saat kaldı.`;
 
   return (
-    <div className={cn('rounded-xl border px-4 py-4 space-y-3', urgent ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50')}>
+    <div className={cn('rounded-xl border p-5 space-y-4', urgent ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50')}>
       <div className="flex items-center gap-2">
-        <AlertTriangle className={cn('h-4 w-4 shrink-0', urgent ? 'text-red-500' : 'text-amber-500')} />
-        <span className={cn('text-sm font-semibold', urgent ? 'text-red-700' : 'text-amber-700')}>
-          {timeLabel}
+        <AlertTriangle className={cn('h-5 w-5 shrink-0', urgent ? 'text-red-500' : 'text-amber-500')} />
+        <span className={cn('text-sm font-bold', urgent ? 'text-red-700' : 'text-amber-700')}>
+          14 Günlük Ücretsiz Deneme
         </span>
       </div>
+
+      <p className={cn('text-sm font-semibold', urgent ? 'text-red-700' : 'text-amber-800')}>
+        {statusText}
+      </p>
+
       {/* Progress bar */}
-      <div className="h-2 rounded-full overflow-hidden bg-black/10">
-        <div
-          className={cn('h-full rounded-full transition-all', urgent ? 'bg-red-500' : 'bg-amber-500')}
-          style={{ width: `${progressPct}%` }}
-        />
+      <div className="space-y-2">
+        <div className="h-2.5 rounded-full overflow-hidden bg-black/10">
+          <div
+            className={cn('h-full rounded-full transition-all duration-1000', urgent ? 'bg-red-500' : 'bg-amber-500')}
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>Başlangıç: {fmt(startsAtMs)}</span>
+          <span>Bitiş: {fmt(endsAtMs)}</span>
+        </div>
       </div>
+
       <p className={cn('text-xs', urgent ? 'text-red-600' : 'text-amber-600')}>
-        Bitiş: {new Date(endsAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })} · Erişimi sürdürmek için Pro plana geçin.
+        Erişimi sürdürmek için aşağıdan Pro plana geçin.
       </p>
     </div>
   );
 }
 
 export default function BillingPage() {
-  const { authHeader: token } = useAuth();
+  const { authHeader: token, ready: authReady } = useAuth();
   const { settings, loadSettings } = useStoreSettings();
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,17 +108,24 @@ export default function BillingPage() {
   }, [loadSettings]);
 
   const fetchStatus = useCallback(async (t: string) => {
-    const res = await fetch('/api/billing/status', { headers: { Authorization: t } });
-    if (!res.ok) { setError('Fatura bilgisi alınamadı.'); setLoading(false); return; }
-    const json = await res.json();
-    setEntitlement(json.data as Entitlement);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/billing/status', { headers: { Authorization: t } });
+      if (!res.ok) { setError('Fatura bilgisi alınamadı.'); setLoading(false); return; }
+      const json = await res.json();
+      setEntitlement(json.data as Entitlement);
+    } catch {
+      setError('Bağlantı hatası.');
+    }
     setLoading(false);
   }, []);
 
+  // Wait for auth to resolve before acting — avoids the premature setLoading(false) race
   useEffect(() => {
+    if (!authReady) return;
     if (!token) { setLoading(false); return; }
     fetchStatus(token);
-  }, [token, fetchStatus]);
+  }, [token, authReady, fetchStatus]);
 
   const handleUpgrade = async () => {
     if (!token) return;
@@ -164,7 +190,7 @@ export default function BillingPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold">Fatura & Plan</h1>
-              <PageHelp title="Fatura & Plan" content={<p>Deneme süresi (14 gün) ve Pro plan bilgileri. Deneme bittiğinde verileriniz silinmez; yalnızca yeni talep kabulü durur. Pro abonelik ikas App Store üzerinden yönetilir.</p>} />
+              <PageHelp title="Fatura & Plan" content={<p>14 günlük ücretsiz deneme ve Pro plan bilgileri. Deneme bittiğinde verileriniz silinmez; yalnızca yeni talep kabulü durur. Pro abonelik ikas App Store üzerinden yönetilir.</p>} />
             </div>
             <p className="text-sm text-muted-foreground">Abonelik durumunuzu yönetin</p>
           </div>
@@ -172,7 +198,7 @@ export default function BillingPage() {
             variant="outline"
             size="sm"
             className="ml-auto gap-1.5"
-            onClick={() => { if (token) { setLoading(true); fetchStatus(token); } }}
+            onClick={() => { if (token) fetchStatus(token); }}
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Yenile
@@ -181,11 +207,11 @@ export default function BillingPage() {
 
         {loading && (
           <div className="space-y-4">
-            {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
           </div>
         )}
 
-        {error && (
+        {error && !loading && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
         )}
 
@@ -235,9 +261,20 @@ export default function BillingPage() {
               </div>
             </div>
 
-            {/* Trial countdown */}
-            {isTrial && entitlement.trialEndsAt && !isExpired && (
+            {/* Trial countdown — shown whenever plan is trial and not expired */}
+            {isTrial && !isExpired && entitlement.trialEndsAt && (
               <TrialCountdown endsAt={entitlement.trialEndsAt} />
+            )}
+
+            {/* Fallback when trialEndsAt is still null after creation (edge-case) */}
+            {isTrial && !isExpired && !entitlement.trialEndsAt && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-700">14 Günlük Ücretsiz Deneme</p>
+                  <p className="text-xs text-amber-600 mt-0.5">Deneme süreniz aktif. Sayfa yenileyerek kalan süreyi görüntüleyin.</p>
+                </div>
+              </div>
             )}
 
             {/* Expired banner */}
