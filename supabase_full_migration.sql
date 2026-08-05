@@ -99,6 +99,7 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='store_settings' AND column_name='return_instructions') THEN ALTER TABLE store_settings ADD COLUMN return_instructions text; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='store_settings' AND column_name='return_deadline_days') THEN ALTER TABLE store_settings ADD COLUMN return_deadline_days integer; END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='store_settings' AND column_name='operation_mode') THEN ALTER TABLE store_settings ADD COLUMN operation_mode text NOT NULL DEFAULT 'both'; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='store_settings' AND column_name='store_key') THEN ALTER TABLE store_settings ADD COLUMN store_key text UNIQUE; END IF; END $$;
 
 ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "store_settings_anon_deny" ON store_settings;
