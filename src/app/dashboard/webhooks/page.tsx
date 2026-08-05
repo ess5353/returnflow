@@ -25,7 +25,7 @@ type Webhook = {
   id: string;
   name: string;
   url: string;
-  secret: string;
+  secret_set: boolean;
   enabled: boolean;
   events: WebhookEvent[];
   created_at: string;
@@ -84,7 +84,9 @@ function WebhookFormModal({
   const initial = state.mode === 'edit' ? state.webhook : null;
   const [name, setName] = useState(initial?.name ?? '');
   const [url, setUrl] = useState(initial?.url ?? '');
-  const [secret, setSecret] = useState(initial?.secret ?? '');
+  // Left blank on edit — the existing secret is never sent back to the client;
+  // a blank value on save means "keep the current secret unchanged".
+  const [secret, setSecret] = useState('');
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
   const [selectedEvents, setSelectedEvents] = useState<WebhookEvent[]>(initial?.events ?? []);
   const [showSecret, setShowSecret] = useState(false);
@@ -97,7 +99,8 @@ function WebhookFormModal({
   }
 
   async function handleSave() {
-    if (!name.trim() || !url.trim() || !secret.trim()) {
+    const secretRequired = state.mode === 'create';
+    if (!name.trim() || !url.trim() || (secretRequired && !secret.trim())) {
       toast('Ad, URL ve secret zorunludur', 'error');
       return;
     }
@@ -108,10 +111,14 @@ function WebhookFormModal({
           ? `/api/webhooks/${state.webhook.id}`
           : '/api/webhooks';
       const method = state.mode === 'edit' ? 'PATCH' : 'POST';
+      const body: Record<string, unknown> = { name, url, enabled, events: selectedEvents };
+      // Only send a secret when the user actually typed a new one — an empty
+      // string here would overwrite the existing secret with a blank value.
+      if (secret.trim()) body.secret = secret;
       const res = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
-        body: JSON.stringify({ name, url, secret, enabled, events: selectedEvents }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -164,7 +171,7 @@ function WebhookFormModal({
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
                 type={showSecret ? 'text' : 'password'}
-                placeholder="HMAC imzalama anahtarı"
+                placeholder={state.mode === 'edit' ? 'Değiştirmek için yeni bir değer girin, boş bırakırsanız mevcut secret korunur' : 'HMAC imzalama anahtarı'}
                 className="pr-9"
               />
               <button

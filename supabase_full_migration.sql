@@ -473,15 +473,24 @@ CREATE POLICY "ai_insights_cache_anon_deny" ON ai_insights_cache FOR ALL TO anon
 
 
 -- ── 20. STORAGE BUCKETS ───────────────────────────────────────────────────────
--- These INSERT statements are idempotent via ON CONFLICT DO NOTHING.
+-- These INSERT statements are idempotent via ON CONFLICT DO UPDATE — re-running
+-- this migration always re-applies the size/MIME restrictions, even if the
+-- bucket already exists from an earlier deployment. (A prior DO NOTHING here
+-- meant a bucket created before this block existed would keep NULL
+-- file_size_limit/allowed_mime_types forever — i.e. unrestricted uploads —
+-- since the INSERT would silently no-op on the existing row. Verified in
+-- production: both buckets had NULL restrictions despite this file specifying
+-- them, allowing arbitrary file types/sizes including SVG with embedded
+-- <script> to the public return-files bucket.)
 -- Run in the Supabase SQL editor or via the Supabase CLI.
 --
--- return-files: Stores customer-uploaded photos and documents.
---   Public read (signed URLs used in dashboard). Anon INSERT allowed for
---   customer portal uploads.
+-- return-files: Stores customer-uploaded photos and videos as return evidence.
+--   Public read. Anon INSERT allowed for customer portal uploads.
 --
 -- store-assets: Stores merchant logo and branding assets.
 --   Public read. Service-role write only (uploaded through dashboard settings).
+--   SVG is intentionally excluded — logos are served via <img> from a public
+--   URL and SVG can carry embedded scripts.
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
@@ -489,9 +498,12 @@ VALUES (
   'return-files',
   true,
   10485760,  -- 10 MB (matches client-side validation)
-  ARRAY['image/jpeg','image/png','image/webp','image/gif','application/pdf','video/mp4','video/quicktime']
+  ARRAY['image/jpeg','image/png','image/webp','image/gif','application/pdf','video/mp4','video/quicktime','video/webm']
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
@@ -499,9 +511,12 @@ VALUES (
   'store-assets',
   true,
   5242880,  -- 5 MB
-  ARRAY['image/jpeg','image/png','image/webp','image/svg+xml']
+  ARRAY['image/jpeg','image/png','image/webp']
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 -- Storage RLS: allow anon INSERT into return-files (customer uploads)
 DO $$

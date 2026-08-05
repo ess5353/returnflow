@@ -5,6 +5,8 @@ import { Resend } from 'resend';
 import { getAuthContext } from '@/lib/auth/context';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { resolveStoreKey } from '@/lib/store/resolve';
+import { AuthTokenManager } from '@/models/auth-token/manager';
+import { getIkas } from '@/helpers/api-helpers';
 import { sendReturnEmail } from '@/lib/email/send';
 import { createNotification } from '@/lib/notifications/create';
 import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
@@ -17,7 +19,7 @@ const returnSchema = z.object({
   store_key:       z.string().min(1).max(100),
   order_id:        z.string().min(1).max(100),
   customer_name:   z.string().min(1).max(200),
-  customer_email:  z.string().email().max(254).optional(),
+  customer_email:  z.string().email().max(254),
   product:         z.string().max(500).optional(),
   products:        z.array(z.object({
     name:     z.string().max(200),
@@ -88,6 +90,29 @@ export async function POST(request: NextRequest) {
   const merchant_id = await resolveStoreKey(store_key);
   if (!merchant_id) {
     return NextResponse.json({ error: 'Store not found' }, { status: 404 });
+  }
+
+  // Verify the order against real ikas data — never trust client-supplied
+  // order_id/customer_email/amount directly. Without this, anyone could POST
+  // here directly (bypassing the portal UI) with a fabricated order and an
+  // inflated amount, and a merchant approving it would issue a real refund
+  // for money that was never actually paid.
+  const authToken = await AuthTokenManager.getByMerchantId(merchant_id);
+  if (!authToken) {
+    return NextResponse.json({ error: 'Store not properly configured' }, { status: 503 });
+  }
+  const ikas = getIkas(authToken);
+  const orderResp = await ikas.queries.listOrderByNumber({
+    orderNumber: { eq: String(order_id).replace('#', '') },
+    customerEmail: { eq: customer_email },
+  });
+  const realOrder = orderResp.data?.listOrder?.data?.[0];
+  if (!realOrder || realOrder.customer?.email?.toLowerCase() !== customer_email.toLowerCase()) {
+    return NextResponse.json({ error: 'Sipariş doğrulanamadı' }, { status: 403 });
+  }
+  const realTotal = Number(realOrder.totalPrice ?? 0);
+  if (Number(amount) > realTotal + 0.01) {
+    return NextResponse.json({ error: 'Geçersiz tutar' }, { status: 400 });
   }
 
   // Compute startOfDay before parallel queries (synchronous)

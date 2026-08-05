@@ -116,11 +116,18 @@ export const SAMPLE_VARS: Record<string, string> = {
   support_email: '',
 };
 
+// Values can originate from customer-controlled data (e.g. their ikas profile
+// name flows into customer_name) — escape before embedding in HTML so a
+// crafted name/field can't inject markup into the rendered email.
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export function renderTemplate(html: string, vars: Record<string, string>): string {
   let result = html.replace(/\{\{#if (\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_, varName: string, content: string) => {
     return vars[varName] ? content : '';
   });
-  result = result.replace(/\{\{(\w+)\}\}/g, (_, varName: string) => vars[varName] ?? '');
+  result = result.replace(/\{\{(\w+)\}\}/g, (_, varName: string) => (vars[varName] ? escapeHtml(vars[varName]) : ''));
   return result;
 }
 

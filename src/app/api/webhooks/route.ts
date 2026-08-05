@@ -23,7 +23,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to load webhooks' }, { status: 500 });
   }
 
-  return NextResponse.json({ data: data ?? [] });
+  // Never re-expose the signing secret after creation — the merchant already
+  // has it (shown once at creation time); a GET should only say whether one
+  // is set, not hand it back in plaintext to whoever can view this page.
+  const masked = (data ?? []).map(({ secret, ...rest }) => ({ ...rest, secret_set: !!secret }));
+
+  return NextResponse.json({ data: masked });
 }
 
 export async function POST(request: NextRequest) {
