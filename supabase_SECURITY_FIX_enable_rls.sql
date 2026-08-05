@@ -1,41 +1,47 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- CRITICAL SECURITY FIX — run this in the Supabase SQL Editor immediately.
+-- CRITICAL SECURITY FIX — v2. Run this in the Supabase SQL Editor immediately.
 --
--- Verified 2026-08-05: the public anon key (NEXT_PUBLIC_SUPABASE_ANON_KEY,
--- embedded in every client bundle by design) can currently read AND write
--- the `return_requests` and `store_settings` tables directly via PostgREST,
--- completely bypassing the Next.js app and every validation/auth check in it.
+-- v1 of this file (ALTER TABLE ... ENABLE ROW LEVEL SECURITY) was run and
+-- confirmed: rowsecurity = true on both tables. That was NOT sufficient —
+-- re-attacking the live project with the anon key afterward proved anon can
+-- still SELECT, INSERT, UPDATE, and DELETE on return_requests, and SELECT on
+-- store_settings. One of those anonymous requests (an UPDATE, part of this
+-- re-verification) briefly overwrote a real row's status before being
+-- reverted with the service_role key.
 --
--- Confirmed live:
---   curl "$SUPABASE_URL/rest/v1/return_requests?select=*" \
---     -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY"
---   -> returns full rows: customer_name, customer_email, order_id, amount,
---      media_urls (uploaded evidence photos/videos), admin_note, across
---      every merchant.
+-- Root cause: RLS was enabled, but at least one additional PERMISSIVE policy
+-- for the anon role is still active on these tables alongside the intended
+-- "*_anon_deny" USING (false) policy. Postgres OR's multiple permissive
+-- policies together — a single permissive policy allowing access defeats any
+-- number of deny policies, regardless of how many exist. supabase_migration.sql
+-- (line 137) references a policy literally named "store_settings_anon_select"
+-- that existed early in this project (from before /api/store-settings and
+-- /api/returns existed and the client queried these tables directly with the
+-- anon key) — that policy, or something equivalent for return_requests, is
+-- almost certainly still live.
 --
---   curl -X POST "$SUPABASE_URL/rest/v1/return_requests" \
---     -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" \
---     -d '{"merchant_id":"...","status":"Tamamlandı","amount":"999999",...}'
---   -> HTTP 201. Anyone can insert an already-"completed" fake return with
---      an arbitrary amount, bypassing the order-verification fix in
---      /api/returns (that fix only protects the app's own POST endpoint —
---      it cannot stop a direct call to Supabase's REST API).
---
--- All 17 other tables in this schema correctly reject anon access — this is
--- not a global RLS-disabled situation. `supabase_full_migration.sql` (and
--- the older supabase_migration.sql, whose own header comments literally
--- suggest "ALTER TABLE ... DISABLE ROW LEVEL SECURITY" as a debugging step)
--- both specify RLS enabled with an anon-deny policy for these two tables —
--- so this is a live drift from what was migrated: RLS was almost certainly
--- switched off manually on just these two tables during development/
--- debugging and never switched back on.
---
--- This does NOT touch how the app itself works: the app never uses the anon
--- key for table access (only for Supabase Storage uploads) — every table
--- read/write goes through Next.js API routes using the service_role key,
--- which bypasses RLS entirely regardless of these policies.
+-- I do not have a way to list the exact policies currently on these tables
+-- (PostgREST only exposes the public/graphql_public schemas — pg_policies is
+-- not reachable over the REST API with any key), so this fix does not depend
+-- on knowing the exact policy name. REVOKE removes the base table-level
+-- privilege grant, which Postgres checks BEFORE it ever evaluates RLS
+-- policies — so it blocks anon/authenticated regardless of how many
+-- permissive policies exist or what they're named, present or future.
 -- ═══════════════════════════════════════════════════════════════════════════
 
+REVOKE ALL ON TABLE public.return_requests FROM anon, authenticated;
+REVOKE ALL ON TABLE public.store_settings FROM anon, authenticated;
+
+-- Belt-and-suspenders: also try to drop the specific leftover policy named in
+-- supabase_migration.sql's own history, and the equivalent guess for
+-- return_requests, in case they're still present under these names.
+DROP POLICY IF EXISTS "store_settings_anon_select" ON public.store_settings;
+DROP POLICY IF EXISTS "return_requests_anon_select" ON public.return_requests;
+DROP POLICY IF EXISTS "return_requests_anon_insert" ON public.return_requests;
+DROP POLICY IF EXISTS "return_requests_public_select" ON public.return_requests;
+DROP POLICY IF EXISTS "return_requests_public_insert" ON public.return_requests;
+
+-- Re-affirm RLS is on and the deny policy exists (idempotent, safe to re-run).
 ALTER TABLE public.return_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
 
@@ -61,8 +67,20 @@ BEGIN
   END IF;
 END $$;
 
--- Verify — both rows must show rowsecurity = true. Then re-run the anon-key
--- curl commands above and confirm they now return [] / 401, not real data.
-SELECT tablename, rowsecurity
-FROM pg_tables
-WHERE schemaname = 'public' AND tablename IN ('return_requests', 'store_settings');
+-- ── Diagnostics — please run this and keep the output. ─────────────────────
+-- This lists every policy currently on these two tables (name, command,
+-- roles, and the actual USING/WITH CHECK expressions). If REVOKE alone
+-- doesn't fully close this, this output identifies exactly what to DROP.
+SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename IN ('return_requests', 'store_settings')
+ORDER BY tablename, policyname;
+
+-- Also list the actual table-level grants for anon/authenticated — should be
+-- EMPTY for both tables after the REVOKE above.
+SELECT table_name, grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public'
+  AND table_name IN ('return_requests', 'store_settings')
+  AND grantee IN ('anon', 'authenticated')
+ORDER BY table_name, grantee, privilege_type;
