@@ -31,6 +31,7 @@ const nextConfig = {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
+      "media-src 'self' blob: https:",
       `connect-src ${connectSrc}`,
       "font-src 'self' data:",
       // email preview uses blob: src-doc iframes
