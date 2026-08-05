@@ -73,6 +73,14 @@ CREATE INDEX IF NOT EXISTS idx_return_requests_order_id          ON return_reque
 CREATE INDEX IF NOT EXISTS idx_return_requests_request_type      ON return_requests (merchant_id, request_type);
 
 ALTER TABLE return_requests ENABLE ROW LEVEL SECURITY;
+-- Explicitly remove known-insecure permissive policies (found live in
+-- pg_policies granting anon direct read/write) before creating the deny
+-- policy — RLS ORs permissive policies together, so leaving any of these in
+-- place defeats the deny policy below regardless of it also existing.
+DROP POLICY IF EXISTS "allow_select_return_requests" ON return_requests;
+DROP POLICY IF EXISTS "allow_insert_return_requests" ON return_requests;
+DROP POLICY IF EXISTS "allow_update_return_requests" ON return_requests;
+DROP POLICY IF EXISTS "allow_delete_return_requests" ON return_requests;
 DROP POLICY IF EXISTS "return_requests_anon_deny" ON return_requests;
 CREATE POLICY "return_requests_anon_deny" ON return_requests FOR ALL TO anon USING (false);
 
@@ -102,6 +110,10 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='store_settings' AND column_name='store_key') THEN ALTER TABLE store_settings ADD COLUMN store_key text UNIQUE; END IF; END $$;
 
 ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
+-- Same as return_requests above — remove the known-insecure permissive
+-- policy found live in pg_policies before creating the deny policy.
+DROP POLICY IF EXISTS "Allow all store settings" ON store_settings;
+DROP POLICY IF EXISTS "store_settings_anon_select" ON store_settings;
 DROP POLICY IF EXISTS "store_settings_anon_deny" ON store_settings;
 CREATE POLICY "store_settings_anon_deny" ON store_settings FOR ALL TO anon USING (false);
 
