@@ -25,12 +25,12 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@supabase/supabase-js": "^2.108.1",
     "@tailwindcss/postcss": "^4.1.12",
-    "axios": "^1.10.0",
+    "axios": "^1.19.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "graphql-request": "^7.0.0",
     "iron-session": "^8.0.4",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.542.0",
@@ -80,5 +80,11 @@
     "onlyBuiltDependencies": [
       "@prisma/client"
     ]
+  },
+  "overrides": {
+    "form-data": ">=4.0.4",
+    "minimatch": ">=9.0.7",
+    "shell-quote": ">=1.8.4",
+    "jws": ">=3.2.3"
   }
 }

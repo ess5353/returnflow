@@ -3,7 +3,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { resolveStoreKey } from '@/lib/store/resolve';
 
 export type PublicStoreSettings = {
-  merchant_id: string;
   store_name: string | null;
   logo_url: string | null;
   primary_color: string | null;
@@ -28,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from('store_settings')
-    .select('merchant_id, store_name, logo_url, primary_color, support_email, return_policy, operation_mode, return_instructions, contact_phone, return_address')
+    .select('store_name, logo_url, primary_color, support_email, return_policy, operation_mode, return_instructions, contact_phone, return_address')
     .eq('merchant_id', merchantId)
     .maybeSingle();
 
@@ -38,7 +37,6 @@ export async function GET(request: NextRequest) {
   }
 
   const settings: PublicStoreSettings = data ?? {
-    merchant_id: merchantId,
     store_name: null,
     logo_url: null,
     primary_color: null,

@@ -9,7 +9,8 @@ import { createAuditLog, getIp, type AuditAction } from '@/lib/audit/log';
 import { sendReturnEmail } from '@/lib/email/send';
 import type { TemplateType } from '@/lib/email/templates';
 
-const NOTIFIABLE_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Kargo Bekleniyor', 'Kargo Alındı', 'İade Edildi', 'Tamamlandı']);
+const VALID_STATUSES = new Set(['Onaylandı', 'Reddedildi', 'Kargo Bekleniyor', 'Kargo Alındı', 'İade Edildi', 'Tamamlandı']);
+const NOTIFIABLE_STATUSES = VALID_STATUSES;
 
 // ── PATCH: update status and/or admin_note ─────────────────────────────────
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -38,7 +39,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const update: Record<string, unknown> = {};
-  if ('status' in body) update.status = body.status;
+  if ('status' in body) {
+    if (typeof body.status !== 'string' || !VALID_STATUSES.has(body.status)) {
+      return NextResponse.json({ error: 'Invalid status value' }, { status: 400 });
+    }
+    update.status = body.status;
+  }
   if ('admin_note' in body) update.admin_note = body.admin_note;
   if ('priority' in body) update.priority = body.priority;
   if ('exchange_price_diff' in body) update.exchange_price_diff = body.exchange_price_diff;

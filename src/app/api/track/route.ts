@@ -27,17 +27,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Store not found' }, { status: 404 });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('return_requests')
-    .select('id, rf_number, order_id, customer_name, reason, description, admin_note, amount, status, created_at, products, media_urls, request_type, exchange_type, exchange_variant, carrier, tracking_number, shipping_status, shipping_date, delivered_date')
-    .or(`order_id.eq.${q},rf_number.eq.${q}`)
-    .ilike('customer_email', email)
-    .eq('merchant_id', merchantId);
+  // Escape ILIKE wildcards so a crafted email can't glob-scan records
+  const safeEmail = email.replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const cols = 'id, rf_number, order_id, customer_name, reason, description, amount, status, created_at, products, media_urls, request_type, exchange_type, exchange_variant, carrier, tracking_number, shipping_status, shipping_date, delivered_date';
 
-  if (error) {
-    console.error('Track search error:', error);
+  const [byOrder, byRf] = await Promise.all([
+    supabaseAdmin.from('return_requests').select(cols).eq('order_id', q).ilike('customer_email', safeEmail).eq('merchant_id', merchantId),
+    supabaseAdmin.from('return_requests').select(cols).eq('rf_number', q).ilike('customer_email', safeEmail).eq('merchant_id', merchantId),
+  ]);
+
+  if (byOrder.error || byRf.error) {
+    console.error('Track search error:', byOrder.error ?? byRf.error);
     return NextResponse.json({ error: 'Search failed' }, { status: 500 });
   }
 
-  return NextResponse.json({ data: data ?? [] });
+  // Merge and deduplicate (order_id and rf_number could match the same row)
+  const seen = new Set<string>();
+  const data: NonNullable<typeof byOrder.data> = [];
+  for (const row of [...(byOrder.data ?? []), ...(byRf.data ?? [])]) {
+    if (!seen.has(row.id)) { seen.add(row.id); data.push(row); }
+  }
+
+  return NextResponse.json({ data });
 }

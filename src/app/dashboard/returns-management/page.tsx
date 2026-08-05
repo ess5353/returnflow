@@ -1212,10 +1212,11 @@ export default function ReturnsManagementPage() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Kanıt Dosyaları</p>
                     <div className="grid grid-cols-2 gap-2">
                       {drawerRow.media_urls.map((url, i) => {
-                        const isVideo = /\.(mp4|mov|webm)/i.test(url);
+                        const isVideo = /\.(mp4|mov|webm)(\?|$)/i.test(url);
+                        const videoType = /\.webm(\?|$)/i.test(url) ? 'video/webm' : /\.mov(\?|$)/i.test(url) ? 'video/quicktime' : 'video/mp4';
                         return isVideo ? (
                           <video key={i} controls className="w-full rounded-lg border border-border">
-                            <source src={url} />
+                            <source src={url} type={videoType} />
                           </video>
                         ) : (
                           <button

@@ -147,7 +147,13 @@ export class TokenHelpers {
    * - Should be called before exchanging authorization code for tokens
    */
   static validateCodeSignature = (code: string, receivedSignature: string, secret: string): boolean => {
-    const expectedSignature = crypto.createHmac('sha256', secret).update(code, 'utf8').digest('hex');
-    return expectedSignature === receivedSignature;
+    const expected = crypto.createHmac('sha256', secret).update(code, 'utf8').digest();
+    const received = Buffer.from(receivedSignature, 'hex');
+    // Constant-time comparison prevents timing-oracle attacks
+    try {
+      return expected.length === received.length && crypto.timingSafeEqual(expected, received);
+    } catch {
+      return false;
+    }
   };
 }

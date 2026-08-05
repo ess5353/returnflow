@@ -270,9 +270,16 @@ export default function TrackPage() {
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-2">Yüklenen Dosyalar</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {request.media_urls.map((url: string, index: number) => (
-                      <img key={index} src={url} alt="media" className="w-full rounded-xl border border-gray-100 object-cover" />
-                    ))}
+                    {request.media_urls.map((url: string, index: number) => {
+                      const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(url);
+                      return isVideo ? (
+                        <video key={index} controls className="w-full rounded-xl border border-gray-100">
+                          <source src={url} type={/\.webm(\?|$)/i.test(url) ? 'video/webm' : /\.mov(\?|$)/i.test(url) ? 'video/quicktime' : 'video/mp4'} />
+                        </video>
+                      ) : (
+                        <img key={index} src={url} alt="media" className="w-full rounded-xl border border-gray-100 object-cover" />
+                      );
+                    })}
                   </div>
                 </div>
               )}

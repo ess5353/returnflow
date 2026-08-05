@@ -28,9 +28,17 @@ const PLAN_BADGE: Record<Plan, string> = {
 
 function TrialCountdown({ endsAt }: { endsAt: string }) {
   const TRIAL_DAYS = 14;
-  const trialStartMs = new Date(endsAt).getTime() - TRIAL_DAYS * 86400000;
-  const remainingMs = Math.max(0, new Date(endsAt).getTime() - Date.now());
+  const endsAtMs = new Date(endsAt).getTime();
   const totalMs = TRIAL_DAYS * 86400000;
+
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const remainingMs = Math.max(0, endsAtMs - now);
   const usedMs = Math.max(0, totalMs - remainingMs);
   const progressPct = Math.min(100, Math.round((usedMs / totalMs) * 100));
 
@@ -43,8 +51,6 @@ function TrialCountdown({ endsAt }: { endsAt: string }) {
     : daysLeft === 0 ? `${hoursLeft} saat kaldı`
     : daysLeft <= 3 ? `${daysLeft} gün ${hoursLeft} saat kaldı`
     : `${daysLeft} gün kaldı`;
-
-  void trialStartMs;
 
   return (
     <div className={cn('rounded-xl border px-4 py-4 space-y-3', urgent ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50')}>
