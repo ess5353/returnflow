@@ -23,8 +23,9 @@ const callbackSchema = z.object({
 
 /**
  * Handles the OAuth callback for Ikas.
- * Validates code signature, optionally validates state for CSRF protection,
- * exchanges the authorization code for tokens, updates session, and redirects.
+ * Validates the code signature and state (both required, matches ikas's
+ * documented authorization flow), exchanges the authorization code for
+ * tokens, updates session, and redirects.
  */
 export async function GET(request: NextRequest) {
   try {
