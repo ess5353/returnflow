@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     // Retrieve the current session and update it with state and storeName
     const session = await getSession();
     session.state = state;
+    session.stateCreatedAt = Date.now();
     session.storeName = storeName;
 
     // Save the updated session before redirecting

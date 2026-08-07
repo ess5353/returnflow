@@ -8,6 +8,7 @@ export interface SessionData {
   merchantId?: string;
   authorizedAppId?: string;
   state?: string;
+  stateCreatedAt?: number;
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: Date;

@@ -13,10 +13,12 @@ import { AuthTokenManager } from '@/models/auth-token/manager';
 import { NextRequest, NextResponse } from 'next/server';
 import z from 'zod';
 
+const STATE_TTL_MS = 60_000;
+
 const callbackSchema = z.object({
   code: z.string().min(1, 'Authorization code is required'),
-  state: z.string().optional(),
-  signature: z.string().optional(),
+  state: z.string().min(1, 'state is required'),
+  signature: z.string().min(1, 'signature is required'),
 });
 
 /**
@@ -44,15 +46,25 @@ export async function GET(request: NextRequest) {
 
     const { code, state, signature } = validation.data;
 
-    // Validate code signature
-    if (signature &&!TokenHelpers.validateCodeSignature(code, signature, config.oauth.clientSecret!)) {
+    // Validate code signature — required per ikas's documented authorization
+    // flow (HMAC-SHA256(code, clientSecret)). Previously this only ran when a
+    // signature param happened to be present, so a callback request that
+    // simply omitted it skipped verification entirely and proceeded straight
+    // to a real token exchange with ikas.
+    if (!TokenHelpers.validateCodeSignature(code, signature, config.oauth.clientSecret!)) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
-    // Retrieve session and optionally check state for CSRF protection
+    // Retrieve session and validate state for CSRF protection — required,
+    // must match the value this app generated at /api/oauth/authorize/ikas,
+    // and must be used within 60 seconds (matches ikas's documented state
+    // TTL). Previously this only checked when both the incoming state and
+    // session.state happened to be present, so a callback with no state
+    // param (or an expired/missing session) bypassed CSRF protection.
     const session = await getSession();
-    if (state && session.state && session.state !== state) {
-      return NextResponse.json({ error: 'Invalid state parameter' }, { status: 400 });
+    const stateAge = session.stateCreatedAt ? Date.now() - session.stateCreatedAt : Infinity;
+    if (!session.state || session.state !== state || stateAge > STATE_TTL_MS) {
+      return NextResponse.json({ error: 'Invalid or expired state parameter' }, { status: 400 });
     }
 
     // Exchange authorization code for access/refresh tokens
@@ -168,6 +180,7 @@ export async function GET(request: NextRequest) {
     session.merchantId = merchantId;
     session.authorizedAppId = authorizedAppId;
     delete session.state;
+    delete session.stateCreatedAt;
 
     // Save updated session
     await setSession(session);
