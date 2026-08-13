@@ -17,15 +17,20 @@ const STATE_TTL_MS = 60_000;
 
 const callbackSchema = z.object({
   code: z.string().min(1, 'Authorization code is required'),
-  state: z.string().min(1, 'state is required'),
-  signature: z.string().min(1, 'signature is required'),
+  storeName: z.string().min(1, 'storeName is required'),
+  state: z.string().min(1).optional(),
+  signature: z.string().min(1).optional(),
 });
 
 /**
  * Handles the OAuth callback for Ikas.
- * Validates the code signature and state (both required, matches ikas's
- * documented authorization flow), exchanges the authorization code for
- * tokens, updates session, and redirects.
+ *
+ * Per ikas (builders.ikas.com), only `code` and `storeName` are guaranteed
+ * on this callback — `state` and `signature` are not always sent. Both are
+ * therefore optional here, but whenever one IS present its corresponding
+ * check still runs and must pass: a present-but-invalid state/signature is
+ * always rejected. Omitting a param skips its check; sending a bad one never
+ * silently passes.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -33,9 +38,10 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url as string, `http://${request.headers.get('host')}`);
     const { searchParams } = url;
 
-    // Validate the incoming request parameters (code, state, signature)
+    // Validate the incoming request parameters (code, storeName required; state, signature optional)
     const validation = validateRequest(callbackSchema, {
       code: searchParams.get('code'),
+      storeName: searchParams.get('storeName'),
       state: searchParams.get('state') || undefined,
       signature: searchParams.get('signature') || undefined,
     });
@@ -45,27 +51,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { code, state, signature } = validation.data;
+    const { code, storeName, state, signature } = validation.data;
 
-    // Validate code signature — required per ikas's documented authorization
-    // flow (HMAC-SHA256(code, clientSecret)). Previously this only ran when a
-    // signature param happened to be present, so a callback request that
-    // simply omitted it skipped verification entirely and proceeded straight
-    // to a real token exchange with ikas.
-    if (!TokenHelpers.validateCodeSignature(code, signature, config.oauth.clientSecret!)) {
+    // Validate code signature (HMAC-SHA256(code, clientSecret)) when ikas sends one.
+    if (signature && !TokenHelpers.validateCodeSignature(code, signature, config.oauth.clientSecret!)) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
-    // Retrieve session and validate state for CSRF protection — required,
-    // must match the value this app generated at /api/oauth/authorize/ikas,
-    // and must be used within 60 seconds (matches ikas's documented state
-    // TTL). Previously this only checked when both the incoming state and
-    // session.state happened to be present, so a callback with no state
-    // param (or an expired/missing session) bypassed CSRF protection.
+    // Retrieve session and validate state for CSRF protection when ikas sends one.
+    // Must match the value this app generated at /api/oauth/authorize/ikas and be
+    // used within 60 seconds (matches ikas's documented state TTL).
     const session = await getSession();
-    const stateAge = session.stateCreatedAt ? Date.now() - session.stateCreatedAt : Infinity;
-    if (!session.state || session.state !== state || stateAge > STATE_TTL_MS) {
-      return NextResponse.json({ error: 'Invalid or expired state parameter' }, { status: 400 });
+    if (state) {
+      const stateAge = session.stateCreatedAt ? Date.now() - session.stateCreatedAt : Infinity;
+      if (!session.state || session.state !== state || stateAge > STATE_TTL_MS) {
+        return NextResponse.json({ error: 'Invalid or expired state parameter' }, { status: 400 });
+      }
     }
 
     // Exchange authorization code for access/refresh tokens
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
         redirect_uri: getRedirectUri(request.headers.get('host')!),
       },
       {
-       storeName: (searchParams.get('storeName') || session.storeName || 'api') as string,
+        storeName,
       },
     );
 
