@@ -200,7 +200,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell storeName={settings?.store_name} logoUrl={settings?.logo_url}>
-      <OnboardingWizard storeKey={settings?.store_key} />
+      <OnboardingWizard storeKey={settings?.store_key} onboardingCompleted={settings?.onboarding_completed} token={token} />
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

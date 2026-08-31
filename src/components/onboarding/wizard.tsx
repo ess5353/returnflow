@@ -56,7 +56,7 @@ function buildSteps(portalUrl: string | null): Step[] {
   ];
 }
 
-export function OnboardingWizard({ storeKey }: { storeKey?: string | null }) {
+export function OnboardingWizard({ storeKey, onboardingCompleted, token }: { storeKey?: string | null; onboardingCompleted?: boolean | null; token?: string | null }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const STEPS = useMemo(
@@ -65,15 +65,26 @@ export function OnboardingWizard({ storeKey }: { storeKey?: string | null }) {
   );
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && !localStorage.getItem(STORAGE_KEY)) {
+    // Source of truth is the per-merchant server flag (persists across
+    // browsers/devices/staff members); onboardingCompleted === undefined
+    // means "still loading settings" — wait rather than flashing the modal.
+    if (onboardingCompleted === undefined || onboardingCompleted === null) return;
+    if (typeof window !== 'undefined' && !onboardingCompleted && !localStorage.getItem(STORAGE_KEY)) {
       const timer = setTimeout(() => setOpen(true), 400);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [onboardingCompleted]);
 
   const handleClose = () => {
     localStorage.setItem(STORAGE_KEY, '1');
     setOpen(false);
+    if (token) {
+      fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token },
+        body: JSON.stringify({ completed: true }),
+      }).catch(() => undefined);
+    }
   };
 
   const handleNext = () => {

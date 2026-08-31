@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
       status: rawOrder.status,
       items:
         rawOrder.orderLineItems?.map((item: any) => ({
+          orderLineItemId: item.id,
           name: item.variant?.name,
           sku: item.variant?.sku,
           quantity: item.quantity,

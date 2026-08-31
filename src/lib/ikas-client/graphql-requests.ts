@@ -106,6 +106,7 @@ query listOrderByNumber($orderNumber: StringFilterInput, $customerEmail: StringF
       currencyCode
       totalPrice
       totalFinalPrice
+      stockLocationId
 
       customer {
         firstName
@@ -114,8 +115,11 @@ query listOrderByNumber($orderNumber: StringFilterInput, $customerEmail: StringF
       }
 
       orderLineItems {
+        id
         quantity
         finalPrice
+        price
+        status
 
         variant {
           id
@@ -124,6 +128,121 @@ query listOrderByNumber($orderNumber: StringFilterInput, $customerEmail: StringF
         }
       }
     }
+  }
+}
+`;
+
+// ── Real ikas order refund/return operations ────────────────────────────────
+// Discovered via ikas MCP list + introspect tools (per project convention) —
+// these mirror the live ikas Admin GraphQL schema exactly, nothing invented.
+
+export const GET_ORDER_FOR_REFUND = gql`
+query getOrderForRefund($id: StringFilterInput) {
+  listOrder(id: $id, pagination: { limit: 1, page: 1 }) {
+    count
+    data {
+      id
+      orderNumber
+      status
+      orderPaymentStatus
+      currencyCode
+      totalFinalPrice
+      stockLocationId
+
+      customer {
+        email
+      }
+
+      orderLineItems {
+        id
+        quantity
+        price
+        finalPrice
+        finalUnitPrice
+        status
+        stockLocationId
+        variant {
+          id
+          name
+          sku
+        }
+      }
+
+      orderPackages {
+        id
+        orderLineItemIds
+        orderPackageFulfillStatus
+      }
+    }
+  }
+}
+`;
+
+export const LIST_ORDER_TRANSACTIONS = gql`
+query listOrderTransactions($orderId: String!) {
+  listOrderTransactions(orderId: $orderId) {
+    id
+    amount
+    status
+    type
+    processedAt
+  }
+}
+`;
+
+export const REFUND_ORDER_LINE = gql`
+mutation refundOrderLine($input: PublicOrderRefundInput!) {
+  refundOrderLine(input: $input) {
+    id
+    status
+    orderPaymentStatus
+    netTotalFinalPrice
+    orderLineItems {
+      id
+      status
+    }
+  }
+}
+`;
+
+export const CANCEL_ORDER_LINE = gql`
+mutation cancelOrderLine($input: CancelOrderLineInput!) {
+  cancelOrderLine(input: $input) {
+    id
+    status
+    orderLineItems {
+      id
+      status
+    }
+  }
+}
+`;
+
+export const UPDATE_ORDER_PACKAGE_STATUS = gql`
+mutation updateOrderPackageStatus($input: UpdateOrderPackageStatusInput!) {
+  updateOrderPackageStatus(input: $input) {
+    id
+    status
+    orderPackages {
+      id
+      orderPackageFulfillStatus
+    }
+  }
+}
+`;
+
+export const ADD_ORDER_TIMELINE_ENTRY = gql`
+mutation addOrderTimelineEntry($input: PublicTimelineInput!) {
+  addOrderTimelineEntry(input: $input)
+}
+`;
+
+export const CREATE_ORDER_WITH_TRANSACTIONS = gql`
+mutation createOrderWithTransactions($input: PublicCreateOrderWithTransactionsInput!) {
+  createOrderWithTransactions(input: $input) {
+    id
+    orderNumber
+    status
   }
 }
 `;

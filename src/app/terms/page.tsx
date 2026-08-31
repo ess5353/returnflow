@@ -40,7 +40,7 @@ export default function TermsPage() {
             <h2 className="text-base font-bold">2. Deneme Süresi ve Ücretlendirme</h2>
             <ul className="list-disc pl-5 text-sm text-gray-700 leading-relaxed space-y-1">
               <li>Uygulama kurulduğunda mağazaya <strong className="text-gray-900">14 gün ücretsiz deneme süresi</strong> tanınır. Deneme süresi boyunca tüm özellikler sınırsız kullanılabilir.</li>
-              <li>Deneme süresi sona erdiğinde, hizmete devam edebilmek için <strong className="text-gray-900">Pro plana (₺12.000/yıl)</strong> geçiş yapılması gerekir. Ödeme, ikas App Store ödeme altyapısı üzerinden tahsil edilir.</li>
+              <li>Deneme süresi sona erdiğinde, hizmete devam edebilmek için <strong className="text-gray-900">Pro plana (₺3.500/yıl)</strong> geçiş yapılması gerekir. Ödeme, ikas App Store ödeme altyapısı üzerinden tahsil edilir.</li>
               <li>Deneme süresi dolduğunda mağazanın mevcut verileri silinmez; yalnızca müşteri portalı üzerinden yeni talep kabulü durdurulur. Mevcut taleplerin görüntülenmesi ve yönetimi mümkün olmaya devam eder.</li>
               <li>Kampanya/indirim dönemlerinde geçerli fiyatlandırma, ikas App Store uygulama listeleme sayfasında ayrıca belirtilir.</li>
             </ul>

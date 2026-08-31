@@ -77,3 +77,4 @@ WARP.md
 config.toml
 opencode.json
 # END Ruler Generated Files
+.env*

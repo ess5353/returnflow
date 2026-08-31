@@ -3,6 +3,7 @@ export const ALL_PERMISSIONS = [
   'returns.approve',
   'returns.reject',
   'returns.complete',
+  'returns.refund',
   'automation.view',
   'automation.create',
   'automation.edit',
@@ -34,7 +35,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const ROLE_PERMISSIONS: Record<Role, Permission[] | ['*']> = {
   owner: ['*'] as ['*'],
   admin: [
-    'returns.view', 'returns.approve', 'returns.reject', 'returns.complete',
+    'returns.view', 'returns.approve', 'returns.reject', 'returns.complete', 'returns.refund',
     'automation.view', 'automation.create', 'automation.edit', 'automation.delete',
     'analytics.view', 'export.generate', 'settings.edit', 'email_templates.edit',
     'api.manage', 'webhooks.manage', 'team.manage',

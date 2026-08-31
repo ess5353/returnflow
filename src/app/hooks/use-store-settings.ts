@@ -14,6 +14,7 @@ export type StoreSettings = {
   return_policy: string | null;
   store_key: string | null;
   operation_mode: 'both' | 'return_only' | 'exchange_only' | null;
+  onboarding_completed?: boolean | null;
 };
 
 // Module-level cache persists across client-side page navigations,

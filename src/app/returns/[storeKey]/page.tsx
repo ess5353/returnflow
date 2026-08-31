@@ -53,7 +53,7 @@ export default function ReturnsPage() {
   const [orderNo, setOrderNo] = useState('');
   const [order, setOrder] = useState<Record<string, unknown> | null>(null);
   const [createdRfNumber, setCreatedRfNumber] = useState('');
-  const [selectedItems, setSelectedItems] = useState<{ name: string; quantity: number; price: number }[]>([]);
+  const [selectedItems, setSelectedItems] = useState<{ orderLineItemId?: string; name: string; sku?: string; quantity: number; price: number }[]>([]);
   const [settings, setSettings] = useState<PublicStoreSettings | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [totalFilesCount, setTotalFilesCount] = useState(0);
@@ -95,7 +95,13 @@ export default function ReturnsPage() {
       customer_name: (order as Record<string, unknown>).customer_name,
       customer_email: email,
       product: selectedItems.map((item) => item.name).join(', '),
-      products: selectedItems.map((item) => ({ name: item.name, quantity: item.quantity, price: item.price })),
+      products: selectedItems.map((item) => ({
+        order_line_item_id: item.orderLineItemId,
+        name: item.name,
+        sku: item.sku,
+        quantity: item.quantity,
+        price: item.price,
+      })),
       amount: selectedItems.reduce((total, item) => total + Number(item.price || 0), 0),
       media_urls: uploadedUrls,
       request_type: requestType,
@@ -188,7 +194,7 @@ export default function ReturnsPage() {
     : (step === 'search' ? 0 : step === 'order' ? 1 : (step === 'reason' || step === 'exchange') ? 2 : 3);
 
   const canSubmitExchange = exchangeType !== null && exchangeVariant.trim().length > 0;
-  const orderItems = ((order as Record<string, unknown>)?.items as { name: string; quantity: number; price: number }[]) ?? [];
+  const orderItems = ((order as Record<string, unknown>)?.items as { orderLineItemId?: string; name: string; sku?: string; quantity: number; price: number }[]) ?? [];
 
   const heroTitle = operationMode === 'return_only'
     ? 'İade Merkezi'
@@ -344,12 +350,13 @@ export default function ReturnsPage() {
                       <p className="text-xs text-gray-500 mb-3">Ürünler</p>
                       <div className="space-y-2">
                         {orderItems.map((item, index) => {
-                          const checked = selectedItems.some((x) => x.name === item.name);
+                          const itemKey = item.orderLineItemId ?? item.name;
+                          const checked = selectedItems.some((x) => (x.orderLineItemId ?? x.name) === itemKey);
                           return (
                             <button
                               key={index}
                               onClick={() => checked
-                                ? setSelectedItems(selectedItems.filter((x) => x.name !== item.name))
+                                ? setSelectedItems(selectedItems.filter((x) => (x.orderLineItemId ?? x.name) !== itemKey))
                                 : setSelectedItems([...selectedItems, item])
                               }
                               style={checked ? { borderColor: accentColor, background: accentColor } : {}}

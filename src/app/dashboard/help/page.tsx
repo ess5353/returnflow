@@ -66,6 +66,24 @@ const MODULES = [
         <div className="rounded-lg bg-muted/60 p-3 text-xs">
           <strong>Not:</strong> Silinen talepler geri alınamaz. Silmeden önce dışa aktarmanız önerilir.
         </div>
+        <h3 className="font-semibold text-sm">Para iadesi nasıl çalışır?</h3>
+        <p className="text-muted-foreground">
+          Bir iade talebi &quot;Kargo Alındı&quot; durumuna geldiğinde <strong>Para İadesi Yap</strong> butonu görünür. Bu butona
+          bastığınızda ReturnFlow, kaydedilmiş sipariş kalemleri için ikas üzerinde <strong>gerçek bir iade işlemi</strong>{' '}
+          gerçekleştirir (ikas&apos;ın <code>refundOrderLine</code> işlemi) — tutar ve ürün miktarı ikas&apos;taki güncel sipariş
+          verisinden yeniden hesaplanır, sipariş kalemleri kilitlenmiş ve tekrar iade edilmez. Talep yalnızca ikas iadeyi
+          başarıyla onayladığında &quot;İade Edildi&quot; olarak işaretlenir ve müşteriye iade e-postası o zaman gönderilir. ikas
+          başarısız olursa (yetki hatası, zaten iade edilmiş kalem vb.) talep &quot;Kargo Alındı&quot; durumunda kalır, hiçbir
+          e-posta gönderilmez ve işlemi tekrar deneyebilirsiniz — aynı iade iki kez gerçekleştirilemez.
+        </p>
+        <h3 className="font-semibold text-sm">Değişimler nasıl çalışır?</h3>
+        <p className="text-muted-foreground">
+          ikas&apos;ta &quot;değişim&quot; için tek bir işlem yoktur; ReturnFlow bunu iki ayrı gerçek ikas işlemiyle uygular:
+          (1) orijinal ürünün iptali ve stoğa geri alınması, (2) yeni ürün için ikas üzerinde gerçek bir değişim siparişi
+          oluşturulması. Fiyat farkı varsa ReturnFlow bunu otomatik olarak tahsil etmez — ikas, uygulamalara rastgele tutar
+          için kart tahsilatı yapan bir API sunmaz; farkı kendi yönteminizle (ödeme linki, elden, vb.) tahsil edip
+          sipariş notuna işleyebilirsiniz.
+        </p>
       </div>
     ),
   },
@@ -315,7 +333,7 @@ const MODULES = [
         <h3 className="font-semibold text-sm">Planlar</h3>
         <ul className="list-disc list-inside space-y-1 text-muted-foreground">
           <li><strong>Deneme (14 gün):</strong> Tüm özellikler ücretsiz; süre dolduğunda yeni talep kabulü duraklar.</li>
-          <li><strong>Pro (₺12.000/yıl, aylık yaklaşık ₺1.000):</strong> Sınırsız talep, tüm özellikler — ikas App Store üzerinden abone olun.</li>
+          <li><strong>Pro (₺3.500/yıl, aylık yaklaşık ₺292):</strong> Sınırsız talep, tüm özellikler — ikas App Store üzerinden abone olun.</li>
         </ul>
         <ul className="list-disc list-inside space-y-1 text-muted-foreground">
           <li>Deneme süresi dolduğunda verileriniz silinmez, yalnızca yeni talep alımı durur.</li>

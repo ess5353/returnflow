@@ -46,6 +46,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   'returns.approve': 'İade Onayla',
   'returns.reject': 'İade Reddet',
   'returns.complete': 'İade Tamamla',
+  'returns.refund': 'Para İadesi Yap',
   'automation.view': 'Otomasyonu Görüntüle',
   'automation.create': 'Otomasyon Oluştur',
   'automation.edit': 'Otomasyonu Düzenle',

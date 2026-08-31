@@ -22,7 +22,9 @@ const returnSchema = z.object({
   customer_email:  z.string().email().max(254),
   product:         z.string().max(500).optional(),
   products:        z.array(z.object({
+    order_line_item_id: z.string().max(100).optional(),
     name:     z.string().max(200),
+    sku:      z.string().max(200).optional(),
     quantity: z.number().int().min(1).max(999),
     price:    z.number().min(0),
   })).max(50).optional(),
@@ -115,6 +117,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz tutar' }, { status: 400 });
   }
 
+  // Cross-check submitted line items against the real ikas order and rebuild
+  // the persisted product snapshot from ikas's own data — never trust a
+  // client-submitted order_line_item_id/price pairing blindly. This is what
+  // lets the refund action later target the exact ikas order line without
+  // re-matching by (unreliable) product name.
+  const realLineById = new Map((realOrder.orderLineItems ?? []).map((l) => [l.id, l]));
+  const verifiedProducts = (products ?? []).map((p) => {
+    if (!p.order_line_item_id) return p;
+    const real = realLineById.get(p.order_line_item_id);
+    if (!real) return { name: p.name, quantity: p.quantity, price: p.price }; // drop unmatched id, keep as unlinked
+    return {
+      order_line_item_id: real.id,
+      name: real.variant?.name ?? p.name,
+      sku: real.variant?.sku ?? p.sku,
+      quantity: Math.min(p.quantity, real.quantity),
+      price: real.finalPrice ?? p.price,
+    };
+  });
+
   // Compute startOfDay before parallel queries (synchronous)
   const now = new Date();
   const datePart = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
@@ -169,10 +190,11 @@ export async function POST(request: NextRequest) {
     merchant_id,
     rf_number,
     order_id: String(order_id),
+    ikas_order_id: realOrder.id ?? null,
     customer_name,
     customer_email: customer_email ?? null,
     product: product ?? '',
-    products: products ?? null,
+    products: verifiedProducts.length > 0 ? verifiedProducts : null,
     reason,
     description: description ?? null,
     amount: String(amount),

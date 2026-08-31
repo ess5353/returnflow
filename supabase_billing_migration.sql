@@ -1,7 +1,7 @@
 -- ============================================================
 -- PELYX / ReturnFlow — Billing Module SQL Migration (v3)
 -- Updated: 2026-08-02
--- Plans: trial (14-day, app-managed) | pro (₺10,000/yr, unlimited)
+-- Plans: trial (14-day, app-managed) | pro (₺3,500/yr, unlimited)
 --        | enterprise (manual) | expired
 -- No request counters or limits — Pro is unlimited.
 -- Safe to run in Supabase SQL editor (idempotent via IF NOT EXISTS)

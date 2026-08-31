@@ -3,6 +3,7 @@ export type WebhookEvent =
   | 'return.approved'
   | 'return.rejected'
   | 'return.completed'
+  | 'return.refunded'
   | 'exchange.created'
   | 'exchange.approved'
   | 'exchange.completed'
@@ -13,6 +14,7 @@ export const WEBHOOK_EVENTS: WebhookEvent[] = [
   'return.approved',
   'return.rejected',
   'return.completed',
+  'return.refunded',
   'exchange.created',
   'exchange.approved',
   'exchange.completed',
@@ -24,6 +26,7 @@ export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = {
   'return.approved': 'İade Onaylandı',
   'return.rejected': 'İade Reddedildi',
   'return.completed': 'İade Tamamlandı',
+  'return.refunded': 'Para İadesi Yapıldı',
   'exchange.created': 'Değişim Oluşturuldu',
   'exchange.approved': 'Değişim Onaylandı',
   'exchange.completed': 'Değişim Tamamlandı',
@@ -90,6 +93,20 @@ export const SAMPLE_PAYLOADS: Record<WebhookEvent, WebhookPayload> = {
       status: 'Tamamlandı',
       request_type: 'return',
       amount: '299.99',
+    },
+  },
+  'return.refunded': {
+    event: 'return.refunded',
+    timestamp: new Date().toISOString(),
+    data: {
+      id: 'uuid-sample',
+      rf_number: 'RF-2026.08.01-0001',
+      order_id: 'ORDER-12345',
+      customer_name: 'Ahmet Yılmaz',
+      status: 'İade Edildi',
+      request_type: 'return',
+      refund_amount: 299.99,
+      refund_currency: 'TRY',
     },
   },
   'exchange.created': {

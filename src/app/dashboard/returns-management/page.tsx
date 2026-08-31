@@ -446,6 +446,7 @@ export default function ReturnsManagementPage() {
   const [adminNote, setAdminNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [refunding, setRefunding] = useState(false);
   const lastOpenedIdRef = useRef<string | null>(null);
 
   // Dialogs
@@ -650,6 +651,30 @@ export default function ReturnsManagementPage() {
       : status === 'İncelemede' ? 'Talep incelemeye alındı'
       : 'Durum güncellendi';
     toast(label, 'success');
+  };
+
+  // Executes a REAL ikas refund (refundOrderLine) — unlike updateStatus,
+  // this is not a plain field update: it calls the ikas API server-side and
+  // only marks the return "İade Edildi" if ikas actually processed the
+  // refund. Server-side idempotency means a double-click here is safe.
+  const processRefund = async (id: string) => {
+    if (!token) return;
+    setRefunding(true);
+    const res = await fetch(`/api/returns/${id}/refund`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: token ?? '' },
+      body: JSON.stringify({}),
+    });
+    const result = await res.json().catch(() => ({}));
+    setRefunding(false);
+
+    if (!res.ok) {
+      toast(result.error ?? 'Para iadesi başarısız oldu', 'error');
+      return;
+    }
+
+    await fetchRows(token);
+    toast(`Para İadesi Yapıldı: ${result.data?.amount} ${result.data?.currency ?? ''}`, 'success');
   };
 
   const saveNote = async () => {
@@ -1323,17 +1348,17 @@ export default function ReturnsManagementPage() {
                     </Button>
                   )}
 
-                  {/* Return-only: refund step */}
-                  {can('returns.complete') && drawerRow.request_type !== 'exchange' && drawerRow.status === 'Kargo Alındı' && (
+                  {/* Return-only: real ikas refund step */}
+                  {can('returns.refund') && drawerRow.request_type !== 'exchange' && drawerRow.status === 'Kargo Alındı' && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full gap-2 border-violet-200 text-violet-600 hover:bg-violet-50"
-                      onClick={() => updateStatus(drawerRow.id, 'İade Edildi')}
-                      disabled={updatingStatus}
+                      onClick={() => processRefund(drawerRow.id)}
+                      disabled={refunding}
                     >
                       <Check className="h-3.5 w-3.5" />
-                      İade İşlendi
+                      {refunding ? 'İade işleniyor...' : 'Para İadesi Yap'}
                     </Button>
                   )}
 

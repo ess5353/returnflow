@@ -43,6 +43,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (typeof body.status !== 'string' || !VALID_STATUSES.has(body.status)) {
       return NextResponse.json({ error: 'Invalid status value' }, { status: 400 });
     }
+    // 'İade Edildi' must only ever be set by a real, successful ikas refund
+    // (POST /api/returns/[id]/refund) — accepting it here would let a
+    // merchant mark a return "refunded" (and fire the customer "money back"
+    // email) without any money ever actually moving in ikas.
+    if (body.status === 'İade Edildi') {
+      return NextResponse.json(
+        { error: 'Bu durum yalnızca gerçek bir ikas para iadesi ile ayarlanabilir. Lütfen "Para İadesi Yap" işlemini kullanın.' },
+        { status: 400 },
+      );
+    }
     update.status = body.status;
   }
   if ('admin_note' in body) update.admin_note = body.admin_note;
