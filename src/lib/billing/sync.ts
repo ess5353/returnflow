@@ -41,7 +41,7 @@ export async function syncMerchantBilling(merchantId: string, authorizedAppId: s
 
     const { data: billing } = await supabaseAdmin
       .from('merchant_billing')
-      .select('plan, status, current_period_start')
+      .select('plan, status, current_period_start, trial_ends_at, ikas_status')
       .eq('merchant_id', merchantId)
       .maybeSingle();
 
@@ -49,9 +49,20 @@ export async function syncMerchantBilling(merchantId: string, authorizedAppId: s
 
     const now = new Date().toISOString();
 
+    // Reaching this point means getMerchantLicence SUCCEEDED, which proves the
+    // OAuth token is valid and the app is authorized on ikas *right now*. Any
+    // deletion marker left over from a past uninstall (APP_DELETED / REMOVED)
+    // is therefore stale — the merchant has reinstalled/re-authorized.
+    const DELETION_MARKERS = ['APP_DELETED', 'REMOVED'];
+    const staleDeletionMarker = DELETION_MARKERS.includes(billing.ikas_status ?? '');
+    const trialWindowStillOpen =
+      billing.plan === 'trial' &&
+      !!billing.trial_ends_at &&
+      new Date(billing.trial_ends_at).getTime() > Date.now();
+
     if (!currentSub) {
-      // Subscription removed — expire any paid plan
       if (billing.plan !== 'trial' && billing.plan !== 'enterprise' && billing.status !== 'expired') {
+        // Paid plan whose subscription really was removed on ikas — expire it.
         await supabaseAdmin
           .from('merchant_billing')
           .update({ status: 'expired', ikas_status: 'REMOVED', ikas_last_synced_at: now, updated_at: now })
@@ -62,10 +73,29 @@ export async function syncMerchantBilling(merchantId: string, authorizedAppId: s
           event: 'cancelled',
           data: { reason: 'ikas_subscription_removed' },
         });
-      } else {
+      } else if (staleDeletionMarker && trialWindowStillOpen && billing.status === 'expired') {
+        // App was uninstalled, then reinstalled while the original 14-day trial
+        // is still running → restore trial access. Never invent a paid state.
         await supabaseAdmin
           .from('merchant_billing')
-          .update({ ikas_status: 'REMOVED', ikas_last_synced_at: now, updated_at: now })
+          .update({ status: 'active', ikas_status: null, ikas_last_synced_at: now, updated_at: now })
+          .eq('merchant_id', merchantId);
+
+        await supabaseAdmin.from('billing_events').insert({
+          merchant_id: merchantId,
+          event: 'trial_started',
+          data: { reason: 'reinstalled_during_trial', trial_ends_at: billing.trial_ends_at },
+        });
+      } else {
+        // Trial expired, or enterprise, or already expired — just clear a stale
+        // deletion marker so ikas_status reflects reality (no subscription).
+        await supabaseAdmin
+          .from('merchant_billing')
+          .update({
+            ikas_status: staleDeletionMarker ? null : (billing.ikas_status ?? null),
+            ikas_last_synced_at: now,
+            updated_at: now,
+          })
           .eq('merchant_id', merchantId);
       }
       return;
