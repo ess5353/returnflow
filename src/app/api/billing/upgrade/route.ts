@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/context';
 import { AuthTokenManager } from '@/models/auth-token/manager';
-import { CREATE_MERCHANT_APP_PAYMENT } from '@/lib/ikas-client/graphql-requests';
+import { CREATE_MERCHANT_APP_PAYMENT, GET_MERCHANT_LICENCE } from '@/lib/ikas-client/graphql-requests';
 import { ikasRawRequest } from '@/lib/ikas-client/raw-request';
 import { config } from '@/globals/config';
 
@@ -52,10 +52,31 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ── Failure: log the REAL provider error (no tokens/secrets), return a
-  //    useful Turkish message keyed to what ikas actually reported. ───────────
+  // ── Failure: log the REAL provider error, return a useful Turkish message
+  //    keyed to what ikas actually reported. ────────────────────────────────
   const ikasErr = result.errors?.[0];
   const ikasCode = (ikasErr?.extensions?.code as string | undefined) ?? undefined;
+
+  const sessionExpired =
+    ikasCode === 'LOGIN_REQUIRED' || ikasErr?.message === 'LOGIN_REQUIRED' || result.httpStatus === 401;
+
+  // Never log the plan key in full. A partial fingerprint (head + tail + length)
+  // is enough for the operator to compare it against the Partner Panel value.
+  const planKeyNotFound = ikasCode === 'APP_SUBSCRIPTION_NOT_FOUND';
+  const keyFingerprint =
+    subscriptionKey.length <= 6
+      ? `len${subscriptionKey.length}`
+      : `${subscriptionKey.slice(0, 6)}…${subscriptionKey.slice(-3)} (len${subscriptionKey.length})`;
+  let licenceProbe: string | null = null;
+  if (planKeyNotFound) {
+    const lic = await ikasRawRequest<{ getMerchantLicence: { appSubscriptions?: unknown[] } | null }>(
+      authToken,
+      GET_MERCHANT_LICENCE,
+    );
+    licenceProbe = lic.ok
+      ? `ok (app authorized; appSubscriptions=${lic.data?.getMerchantLicence?.appSubscriptions?.length ?? 0})`
+      : `failed http=${lic.httpStatus} ${lic.errors?.[0]?.message ?? ''}`;
+  }
 
   console.error('[billing/upgrade] createMerchantAppPayment failed', {
     merchantId: user.merchantId,
@@ -64,16 +85,10 @@ export async function POST(request: NextRequest) {
     httpStatus: result.httpStatus,
     ikasCode: ikasCode ?? null,
     ikasMessage: ikasErr?.message ?? null,
-    ikasErrors: result.errors,
     bodySnippet: result.bodySnippet,
-    // fingerprint only — never log the key itself
-    subscriptionKeyFingerprint: `${subscriptionKey.slice(0, 4)}…len${subscriptionKey.length}`,
+    subscriptionKeyFingerprint: keyFingerprint,
+    licenceProbe,
   });
-
-  const sessionExpired =
-    ikasCode === 'LOGIN_REQUIRED' ||
-    ikasErr?.message === 'LOGIN_REQUIRED' ||
-    result.httpStatus === 401;
 
   if (sessionExpired) {
     return NextResponse.json(
