@@ -4,6 +4,7 @@ import { getAuthContext } from '@/lib/auth/context';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { CREATE_MERCHANT_APP_PAYMENT } from '@/lib/ikas-client/graphql-requests';
 import { ikasRawRequest } from '@/lib/ikas-client/raw-request';
+import { config } from '@/globals/config';
 
 type CreatePaymentData = {
   createMerchantAppPayment: {
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
   console.error('[billing/upgrade] createMerchantAppPayment failed', {
     merchantId: user.merchantId,
     authorizedAppId: user.authorizedAppId,
+    graphApiUrl: config.graphApiUrl,
     httpStatus: result.httpStatus,
     ikasCode: ikasCode ?? null,
     ikasMessage: ikasErr?.message ?? null,
