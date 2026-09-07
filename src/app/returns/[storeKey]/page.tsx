@@ -55,6 +55,7 @@ export default function ReturnsPage() {
   const [createdRfNumber, setCreatedRfNumber] = useState('');
   const [selectedItems, setSelectedItems] = useState<{ orderLineItemId?: string; name: string; sku?: string; quantity: number; price: number }[]>([]);
   const [settings, setSettings] = useState<PublicStoreSettings | null>(null);
+  const [available, setAvailable] = useState<boolean | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [totalFilesCount, setTotalFilesCount] = useState(0);
 
@@ -62,8 +63,11 @@ export default function ReturnsPage() {
     if (!storeKey) return;
     fetch(`/api/store-settings?storeKey=${encodeURIComponent(storeKey)}`)
       .then((res) => res.json())
-      .then((result) => { if (result.data) setSettings(result.data); })
-      .catch(() => undefined);
+      .then((result) => {
+        if (result.data) setSettings(result.data);
+        setAvailable(result.available !== false);
+      })
+      .catch(() => setAvailable(true));
   }, [storeKey]);
 
   const createRequest = async () => {
@@ -127,8 +131,9 @@ export default function ReturnsPage() {
 
     if (!res.ok || !result.data) {
       setIsSubmitting(false);
-      if (res.status === 403 && result.code === 'PLAN_EXPIRED') {
-        toast('Bu mağaza şu anda iade kabulü yapmıyor. Lütfen mağazayla iletişime geçin.', 'error');
+      if (res.status === 403 && (result.code === 'PORTAL_UNAVAILABLE' || result.code === 'PLAN_EXPIRED')) {
+        setAvailable(false);
+        toast('Bu mağazanın iade portalı şu anda kullanılamıyor.', 'error');
       } else {
         toast(res.status === 409 ? 'Bu sipariş için zaten bir talep oluşturulmuş.' : 'Kayıt sırasında hata oluştu', 'error');
       }
@@ -154,6 +159,11 @@ export default function ReturnsPage() {
     setIsFindingOrder(false);
 
     if (!result.success) {
+      if (response.status === 403 && result.code === 'PORTAL_UNAVAILABLE') {
+        setAvailable(false);
+        toast('Bu mağazanın iade portalı şu anda kullanılamıyor.', 'error');
+        return;
+      }
       toast('Sipariş bulunamadı', 'error');
       return;
     }
@@ -203,6 +213,40 @@ export default function ReturnsPage() {
       : (requestType === 'exchange' && step !== 'type' ? 'Değişim Merkezi' : 'İade & Değişim');
 
   const brandName = settings?.store_name || 'Mağaza';
+
+  if (available === false) {
+    const accent = settings?.primary_color || '#000000';
+    return (
+      <main className="min-h-screen bg-[#f5f6fa] px-4 py-8 md:p-10 flex items-center justify-center">
+        <section className="mx-auto w-full max-w-md">
+          <div className="rounded-3xl bg-white shadow-xl overflow-hidden border border-gray-100 p-8 md:p-10 text-center">
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt="Logo" className="mx-auto h-14 w-14 rounded-xl object-contain border border-gray-100 p-1.5" />
+            ) : (
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl" style={{ background: accent }}>
+                <RotateCcw className="h-6 w-6 text-white" />
+              </div>
+            )}
+            <h1 className="mt-6 text-xl font-bold text-gray-900">İade Portalı Şu Anda Kullanılamıyor</h1>
+            <p className="mt-3 text-sm leading-relaxed text-gray-500">
+              {brandName} için iade ve değişim talepleri geçici olarak alınamıyor.
+              Lütfen daha sonra tekrar deneyin veya siparişinizle ilgili destek için
+              doğrudan mağaza ile iletişime geçin.
+            </p>
+            {settings?.support_email && (
+              <a
+                href={`mailto:${settings.support_email}`}
+                className="mt-6 inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
+                style={{ background: accent }}
+              >
+                Mağaza ile İletişime Geç
+              </a>
+            )}
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f5f6fa] px-4 py-8 md:p-10">

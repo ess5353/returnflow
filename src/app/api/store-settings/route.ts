@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { resolveStoreKey } from '@/lib/store/resolve';
+import { getBillingEntitlement } from '@/lib/billing/entitlement';
 
 export type PublicStoreSettings = {
   store_name: string | null;
@@ -25,11 +26,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Store not found' }, { status: 404 });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('store_settings')
-    .select('store_name, logo_url, primary_color, support_email, return_policy, operation_mode, return_instructions, contact_phone, return_address')
-    .eq('merchant_id', merchantId)
-    .maybeSingle();
+  const [{ data, error }, entitlement] = await Promise.all([
+    supabaseAdmin
+      .from('store_settings')
+      .select('store_name, logo_url, primary_color, support_email, return_policy, operation_mode, return_instructions, contact_phone, return_address')
+      .eq('merchant_id', merchantId)
+      .maybeSingle(),
+    getBillingEntitlement(merchantId),
+  ]);
 
   if (error) {
     console.error('store_settings sorgusu başarısız:', error);
@@ -48,5 +52,8 @@ export async function GET(request: NextRequest) {
     return_address: null,
   };
 
-  return NextResponse.json({ data: settings });
+  // `available` tells the public portal whether the merchant may currently
+  // accept new return/exchange requests. It carries NO billing detail — the
+  // portal only ever shows a neutral "temporarily unavailable" screen.
+  return NextResponse.json({ data: settings, available: entitlement.isActive });
 }

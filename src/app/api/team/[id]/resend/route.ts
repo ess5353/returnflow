@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/context';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(
@@ -10,6 +11,8 @@ export async function POST(
 ) {
   const ctx = getAuthContext(request);
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(ctx.merchantId);
+  if (gate) return gate;
   if (!ctx.can('team.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { id } = await params;

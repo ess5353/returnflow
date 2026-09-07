@@ -1,12 +1,15 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/context';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { sendReturnEmail } from '@/lib/email/send';
 import type { TemplateType } from '@/lib/email/templates';
 
 export async function POST(request: NextRequest) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(user.merchantId);
+  if (gate) return gate;
 
   let body: { return_id?: string; template_type?: string };
   try {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/context';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
 
@@ -10,6 +11,9 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const gate = await requireActiveEntitlement(user.merchantId);
+    if (gate) return gate;
 
     const authToken = await AuthTokenManager.get(user.authorizedAppId);
 

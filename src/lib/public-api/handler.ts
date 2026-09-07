@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateApiKey, type ApiKeyContext } from './auth';
 import { checkRateLimit } from './rate-limit';
 import { logApiRequest } from './log';
+import { getBillingEntitlement } from '@/lib/billing/entitlement';
 
 type PublicHandler = (
   request: NextRequest,
@@ -17,6 +18,25 @@ export function withPublicAuth(endpoint: string, handler: PublicHandler) {
       return NextResponse.json(
         { error: 'Unauthorized', code: 'INVALID_API_KEY' },
         { status: 401 },
+      );
+    }
+
+    // Entitlement gate — a merchant whose trial expired with no active paid
+    // subscription cannot use their REST API (a paid feature) either.
+    const entitlement = await getBillingEntitlement(ctx.merchantId);
+    if (!entitlement.isActive) {
+      logApiRequest({
+        merchantId: ctx.merchantId,
+        apiKeyId: ctx.apiKeyId,
+        keyPrefix: ctx.keyPrefix,
+        endpoint,
+        method: request.method,
+        responseCode: 402,
+        responseTimeMs: Date.now() - start,
+      });
+      return NextResponse.json(
+        { error: 'ReturnFlow Pro aboneliği gerekli', code: 'SUBSCRIPTION_REQUIRED' },
+        { status: 402 },
       );
     }
 

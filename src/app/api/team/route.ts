@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthContext } from '@/lib/auth/context';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { ROLES, type Role } from '@/lib/auth/permissions';
 import { createAuditLog, getIp } from '@/lib/audit/log';
@@ -17,6 +18,8 @@ const inviteSchema = z.object({
 export async function GET(request: NextRequest) {
   const ctx = getAuthContext(request);
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(ctx.merchantId);
+  if (gate) return gate;
   if (!ctx.can('team.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { data, error } = await supabaseAdmin
@@ -36,6 +39,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const ctx = getAuthContext(request);
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(ctx.merchantId);
+  if (gate) return gate;
   if (!ctx.can('team.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   // Rate limit: 10 invites per merchant per hour

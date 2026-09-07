@@ -13,6 +13,7 @@ import { triggerWebhookEvent } from '@/lib/webhooks/trigger';
 import { createAuditLog } from '@/lib/audit/log';
 import { rateLimit, getClientIp, LIMITS } from '@/lib/security/rate-limit';
 import { getBillingEntitlement } from '@/lib/billing/entitlement';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { evaluateAndApplyAutomation } from '@/lib/automation/evaluate';
 
 const returnSchema = z.object({
@@ -41,6 +42,8 @@ const returnSchema = z.object({
 export async function GET(request: NextRequest) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(user.merchantId);
+  if (gate) return gate;
   if (!user.can('returns.view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { data, error } = await supabaseAdmin
@@ -172,8 +175,11 @@ export async function POST(request: NextRequest) {
   }
 
   if (entitlement.isExpired) {
+    // Customer-facing endpoint — never leak the merchant's billing state to a
+    // shopper. The portal renders a neutral "temporarily unavailable" screen
+    // off this code.
     return NextResponse.json(
-      { error: 'Subscription expired', code: 'PLAN_EXPIRED', upgrade_required: true },
+      { error: 'Bu mağazanın iade portalı şu anda kullanılamıyor.', code: 'PORTAL_UNAVAILABLE' },
       { status: 403 },
     );
   }

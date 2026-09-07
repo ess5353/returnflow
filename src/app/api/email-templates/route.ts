@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/context';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { DEFAULT_TEMPLATES, TEMPLATE_META, type TemplateType } from '@/lib/email/templates';
 
@@ -17,6 +18,8 @@ const ALL_TYPES: TemplateType[] = [
 export async function GET(request: NextRequest) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(user.merchantId);
+  if (gate) return gate;
 
   const { data, error } = await supabaseAdmin
     .from('email_templates')

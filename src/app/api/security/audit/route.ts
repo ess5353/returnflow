@@ -1,11 +1,14 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/context';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { checkEnvVars, computeSecurityScore, getMissingRequired } from '@/lib/security/env-check';
 
 export async function GET(request: NextRequest) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(user.merchantId);
+  if (gate) return gate;
   // Only owners can view the security audit
   if (!user.isOwner) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 

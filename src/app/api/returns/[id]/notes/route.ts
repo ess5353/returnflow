@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth/context';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createNotification } from '@/lib/notifications/create';
 
@@ -10,6 +11,8 @@ export async function GET(
 ) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(user.merchantId);
+  if (gate) return gate;
 
   const { id } = await params;
 
@@ -43,6 +46,8 @@ export async function POST(
 ) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(user.merchantId);
+  if (gate) return gate;
 
   const { id } = await params;
 

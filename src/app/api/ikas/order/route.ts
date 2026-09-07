@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveStoreKey } from '@/lib/store/resolve';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
+import { getBillingEntitlement } from '@/lib/billing/entitlement';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,6 +21,16 @@ export async function GET(request: NextRequest) {
     const merchantId = await resolveStoreKey(storeKey);
     if (!merchantId) {
       return NextResponse.json({ success: false, error: 'Store not found' }, { status: 404 });
+    }
+
+    // Neutral unavailability when the merchant's ReturnFlow access has lapsed —
+    // never expose billing state to the shopper.
+    const entitlement = await getBillingEntitlement(merchantId);
+    if (!entitlement.isActive) {
+      return NextResponse.json(
+        { success: false, error: 'Bu mağazanın iade portalı şu anda kullanılamıyor.', code: 'PORTAL_UNAVAILABLE' },
+        { status: 403 },
+      );
     }
 
     const authToken = await AuthTokenManager.getByMerchantId(merchantId);

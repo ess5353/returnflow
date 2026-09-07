@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthContext } from '@/lib/auth/context';
+import { requireActiveEntitlement } from '@/lib/billing/guard';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createAuditLog, getIp } from '@/lib/audit/log';
 
@@ -39,6 +40,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = getAuthContext(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireActiveEntitlement(user.merchantId);
+  if (gate) return gate;
   if (!user.can('settings.edit')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   let raw: unknown;
