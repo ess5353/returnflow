@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeftRight, CheckCircle2, ExternalLink, Lock, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeftRight, CheckCircle2, ExternalLink, Lock, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import { STAFF_TOKEN_KEY } from '@/hooks/use-auth';
@@ -26,6 +26,12 @@ const FEATURES = [
   'Ekip yönetimi ve API erişimi',
 ];
 
+// After the merchant opens the ikas payment page we poll our own /confirm
+// endpoint (which reads the authoritative ikas licence) so ReturnFlow unlocks
+// on its own the moment the payment lands — no button press required.
+const POLL_INTERVAL_MS = 5_000;
+const POLL_DURATION_MS = 8 * 60_000;
+
 export function Paywall({
   entitlement,
   authHeader,
@@ -37,9 +43,85 @@ export function Paywall({
 }: PaywallProps) {
   const [starting, setStarting] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [awaitingPayment, setAwaitingPayment] = useState(false);
+
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollDeadline = useRef<number>(0);
+  const inFlight = useRef(false);
 
   const wasPaid = entitlement?.blockedReason === 'subscription_expired';
   const title = wasPaid ? 'Aboneliğiniz Sona Erdi' : 'Ücretsiz Deneme Süreniz Sona Erdi';
+
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current) {
+      clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
+    setAwaitingPayment(false);
+  }, []);
+
+  /** One activation check against ikas's authoritative licence. */
+  const runConfirm = useCallback(
+    async (opts?: { silent?: boolean }): Promise<boolean> => {
+      if (!authHeader || inFlight.current) return false;
+      inFlight.current = true;
+      try {
+        const res = await fetch('/api/billing/confirm', {
+          method: 'POST',
+          headers: { Authorization: authHeader },
+        });
+        const json = await res.json().catch(() => null);
+        if (res.ok && json?.data?.entitlement?.isActive) {
+          stopPolling();
+          toast('Aboneliğiniz etkinleştirildi. ReturnFlow açılıyor…', 'success');
+          onReactivated();
+          return true;
+        }
+        if (!opts?.silent) {
+          toast(
+            'Ödeme henüz görünmüyor. Ödemeyi ikas üzerinden tamamladıysanız birkaç dakika içinde otomatik açılacaktır.',
+            'info',
+          );
+        }
+        return false;
+      } catch {
+        if (!opts?.silent) toast('Bağlantı hatası.', 'error');
+        return false;
+      } finally {
+        inFlight.current = false;
+      }
+    },
+    [authHeader, onReactivated, stopPolling],
+  );
+
+  const startPolling = useCallback(() => {
+    if (pollTimer.current) return;
+    pollDeadline.current = Date.now() + POLL_DURATION_MS;
+    setAwaitingPayment(true);
+    pollTimer.current = setInterval(() => {
+      if (Date.now() > pollDeadline.current) {
+        stopPolling();
+        return;
+      }
+      void runConfirm({ silent: true });
+    }, POLL_INTERVAL_MS);
+  }, [runConfirm, stopPolling]);
+
+  // Re-check the instant the merchant switches back to this tab (e.g. right
+  // after paying in the ikas tab).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && awaitingPayment) void runConfirm({ silent: true });
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [awaitingPayment, runConfirm]);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
 
   const startPurchase = async () => {
     if (!authHeader) return;
@@ -49,13 +131,14 @@ export function Paywall({
         method: 'POST',
         headers: { Authorization: authHeader },
       });
-      const json = await res.json();
-      if (!res.ok || !json.data?.paymentUrl) {
-        toast((json.error as string | undefined) ?? 'Ödeme başlatılamadı.', 'error');
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.data?.paymentUrl) {
+        toast((json?.error as string | undefined) ?? 'Ödeme başlatılamadı. Lütfen tekrar deneyin.', 'error');
         return;
       }
       window.open(json.data.paymentUrl as string, '_blank', 'noopener,noreferrer');
-      toast('ikas ödeme sayfası açıldı. Ödemeyi tamamladıktan sonra "Ödemeyi Kontrol Et" butonuna dokunun.', 'info');
+      startPolling();
+      toast('ikas ödeme sayfası açıldı. Ödeme tamamlandığında ReturnFlow otomatik olarak açılacaktır.', 'info');
     } catch {
       toast('Bağlantı hatası.', 'error');
     } finally {
@@ -64,25 +147,9 @@ export function Paywall({
   };
 
   const checkPayment = async () => {
-    if (!authHeader) return;
     setChecking(true);
-    try {
-      const res = await fetch('/api/billing/confirm', {
-        method: 'POST',
-        headers: { Authorization: authHeader },
-      });
-      const json = await res.json();
-      if (res.ok && json.data?.entitlement?.isActive) {
-        toast('Aboneliğiniz etkinleştirildi. Hoş geldiniz!', 'success');
-        onReactivated();
-        return;
-      }
-      toast('Ödeme henüz görünmüyor. Ödemeyi tamamladıysanız birkaç dakika sonra tekrar deneyin.', 'info');
-    } catch {
-      toast('Bağlantı hatası.', 'error');
-    } finally {
-      setChecking(false);
-    }
+    await runConfirm();
+    setChecking(false);
   };
 
   const logout = () => {
@@ -146,7 +213,7 @@ export function Paywall({
                 <>
                   <Button size="lg" className="w-full gap-2" onClick={startPurchase} disabled={starting}>
                     <ExternalLink className="h-4 w-4" />
-                    {starting ? 'Yönlendiriliyor...' : "ReturnFlow'u Satın Al"}
+                    {starting ? 'Yönlendiriliyor…' : "ReturnFlow'u Satın Al"}
                   </Button>
                   <Button
                     size="lg"
@@ -156,8 +223,15 @@ export function Paywall({
                     disabled={checking}
                   >
                     <RefreshCw className={checking ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-                    {checking ? 'Kontrol ediliyor...' : 'Ödemeyi Kontrol Et'}
+                    {checking ? 'Kontrol ediliyor…' : 'Ödemeyi Kontrol Et'}
                   </Button>
+
+                  {awaitingPayment && (
+                    <p className="flex items-center justify-center gap-2 pt-1 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Ödeme bekleniyor — tamamlandığında otomatik açılacak.
+                    </p>
+                  )}
                 </>
               ) : (
                 <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">

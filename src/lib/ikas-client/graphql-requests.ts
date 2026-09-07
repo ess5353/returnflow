@@ -43,6 +43,30 @@ export const CREATE_MERCHANT_APP_PAYMENT = gql`
       id
       merchantPaymentUrl
       status
+      storeAppListingSubscriptionKey
+    }
+  }
+`;
+
+// The authoritative list of subscription plans ikas has published for THIS app.
+// This is where the real `storeAppListingSubscriptionKey` comes from — it must
+// never be hardcoded/guessed, because ikas derives the key from the plan name
+// (e.g. the Turkish "İade & Değişim" lowercases to a key containing a combining
+// dot-above codepoint that is impossible to type reliably into an env var).
+export const GET_AVAILABLE_SUBSCRIPTIONS = gql`
+  query getAvailableSubscriptions {
+    getAvailableSubscriptions {
+      id
+      key
+      name
+      currencyCode
+      prices {
+        period
+        price
+      }
+      trialConfig {
+        days
+      }
     }
   }
 `;
@@ -54,7 +78,10 @@ export const LIST_MERCHANT_APP_PAYMENT = gql`
       data {
         id
         status
+        type
         paymentDate
+        createdAt
+        merchantPaymentUrl
         storeAppListingSubscriptionKey
       }
     }

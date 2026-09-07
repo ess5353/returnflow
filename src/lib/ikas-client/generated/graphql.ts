@@ -1,48 +1,5 @@
 import { BaseGraphQLAPIClient, BaseGraphQLAPIClientOptions, APIResult } from '@ikas/admin-api-client';
 
-// NOTE: These enums are manually maintained — codegen does not emit enums
-// that are only referenced as a field type within a selection set (as
-// opposed to being used as an operation's variable type). Re-add after any
-// `pnpm codegen` run that removes them.
-export enum MerchantSubscriptionStatusEnum {
-  ACTIVE = "ACTIVE",
-  REMOVED = "REMOVED",
-  WILL_BE_REMOVED = "WILL_BE_REMOVED"
-}
-
-export enum OrderLineItemStatusEnum {
-  CANCELLED = "CANCELLED",
-  CANCEL_REJECTED = "CANCEL_REJECTED",
-  CANCEL_REQUESTED = "CANCEL_REQUESTED",
-  DELIVERED = "DELIVERED",
-  FULFILLED = "FULFILLED",
-  PLANNED = "PLANNED",
-  REFUNDED = "REFUNDED",
-  REFUND_REJECTED = "REFUND_REJECTED",
-  REFUND_REQUESTED = "REFUND_REQUESTED",
-  REFUND_REQUEST_ACCEPTED = "REFUND_REQUEST_ACCEPTED",
-  RETURN_DELIVERED = "RETURN_DELIVERED",
-  RETURN_IN_TRANSIT = "RETURN_IN_TRANSIT",
-  RETURN_PARCEL_WAITING = "RETURN_PARCEL_WAITING",
-  RETURN_REJECTED = "RETURN_REJECTED",
-  UNFULFILLED = "UNFULFILLED",
-  WAITING_FOR_PACKAGING = "WAITING_FOR_PACKAGING"
-}
-
-export enum TransactionStatusEnum {
-  AUTHORIZED = "AUTHORIZED",
-  CANCELLED = "CANCELLED",
-  FAILED = "FAILED",
-  PENDING = "PENDING",
-  SUCCESS = "SUCCESS"
-}
-
-export enum TransactionTypeEnum {
-  REFUND = "REFUND",
-  SALE = "SALE",
-  VOID = "VOID"
-}
-
 export enum MerchantAppPaymentStatusEnum {
   PAID = "PAID",
   PAYMENT_FAILED = "PAYMENT_FAILED",
@@ -107,6 +64,60 @@ export enum OrderStatusEnum {
   REFUND_REJECTED = "REFUND_REJECTED",
   REFUND_REQUESTED = "REFUND_REQUESTED",
   WAITING_UPSELL_ACTION = "WAITING_UPSELL_ACTION"
+}
+
+// NOTE: These enums are manually maintained — codegen does not emit enums that
+// are only referenced as a field type within a selection set (as opposed to an
+// operation's variable type). RE-ADD this whole block after any `pnpm codegen`.
+export enum MerchantSubscriptionStatusEnum {
+  ACTIVE = "ACTIVE",
+  REMOVED = "REMOVED",
+  WILL_BE_REMOVED = "WILL_BE_REMOVED"
+}
+export enum OrderLineItemStatusEnum {
+  CANCELLED = "CANCELLED",
+  CANCEL_REJECTED = "CANCEL_REJECTED",
+  CANCEL_REQUESTED = "CANCEL_REQUESTED",
+  DELIVERED = "DELIVERED",
+  FULFILLED = "FULFILLED",
+  PLANNED = "PLANNED",
+  REFUNDED = "REFUNDED",
+  REFUND_REJECTED = "REFUND_REJECTED",
+  REFUND_REQUESTED = "REFUND_REQUESTED",
+  REFUND_REQUEST_ACCEPTED = "REFUND_REQUEST_ACCEPTED",
+  RETURN_DELIVERED = "RETURN_DELIVERED",
+  RETURN_IN_TRANSIT = "RETURN_IN_TRANSIT",
+  RETURN_PARCEL_WAITING = "RETURN_PARCEL_WAITING",
+  RETURN_REJECTED = "RETURN_REJECTED",
+  UNFULFILLED = "UNFULFILLED",
+  WAITING_FOR_PACKAGING = "WAITING_FOR_PACKAGING"
+}
+export enum TransactionStatusEnum {
+  AUTHORIZED = "AUTHORIZED",
+  CANCELLED = "CANCELLED",
+  FAILED = "FAILED",
+  PENDING = "PENDING",
+  SUCCESS = "SUCCESS"
+}
+export enum TransactionTypeEnum {
+  REFUND = "REFUND",
+  SALE = "SALE",
+  VOID = "VOID"
+}
+export enum SubscriptionPriceCurrencyEnum {
+  EUR = "EUR",
+  TRY = "TRY",
+  USD = "USD"
+}
+export enum SubscriptionPeriodEnum {
+  MONTHLY = "MONTHLY",
+  ONE_TIME = "ONE_TIME",
+  YEARLY = "YEARLY"
+}
+export enum MerchantAppPaymentTypeEnum {
+  ONE_TIME = "ONE_TIME",
+  SUBSCRIPTION = "SUBSCRIPTION",
+  WALLET_ACTION = "WALLET_ACTION"
 }
 
 export type BundleProductOrderLineInput = {
@@ -409,10 +420,31 @@ export type CreateMerchantAppPaymentMutationData = {
   id: string;
   merchantPaymentUrl: string;
   status: MerchantAppPaymentStatusEnum;
+  storeAppListingSubscriptionKey?: string;
 }
 
 export interface CreateMerchantAppPaymentMutation {
   createMerchantAppPayment: CreateMerchantAppPaymentMutationData;
+}
+
+export type GetAvailableSubscriptionsQueryVariables = {}
+
+export type GetAvailableSubscriptionsQueryData = Array<{
+  id: string;
+  key: string;
+  name: string;
+  currencyCode: SubscriptionPriceCurrencyEnum;
+  prices: Array<{
+  period: SubscriptionPeriodEnum;
+  price: number;
+}>;
+  trialConfig: {
+  days: number;
+};
+}>
+
+export interface GetAvailableSubscriptionsQuery {
+  getAvailableSubscriptions: GetAvailableSubscriptionsQueryData;
 }
 
 export type ListMerchantAppPaymentQueryVariables = {}
@@ -422,7 +454,10 @@ export type ListMerchantAppPaymentQueryData = {
   data: Array<{
   id: string;
   status: MerchantAppPaymentStatusEnum;
+  type: MerchantAppPaymentTypeEnum;
   paymentDate?: number;
+  createdAt?: number;
+  merchantPaymentUrl: string;
   storeAppListingSubscriptionKey?: string;
 }>;
 }
@@ -692,6 +727,27 @@ export class GeneratedQueries {
     return this.client.query<Partial<GetMerchantLicenceQuery>>({ query });
   }
 
+  async getAvailableSubscriptions(): Promise<APIResult<Partial<GetAvailableSubscriptionsQuery>>> {
+    const query = `
+  query getAvailableSubscriptions {
+    getAvailableSubscriptions {
+      id
+      key
+      name
+      currencyCode
+      prices {
+        period
+        price
+      }
+      trialConfig {
+        days
+      }
+    }
+  }
+`;
+    return this.client.query<Partial<GetAvailableSubscriptionsQuery>>({ query });
+  }
+
   async listMerchantAppPayment(): Promise<APIResult<Partial<ListMerchantAppPaymentQuery>>> {
     const query = `
   query listMerchantAppPayment {
@@ -700,7 +756,10 @@ export class GeneratedQueries {
       data {
         id
         status
+        type
         paymentDate
+        createdAt
+        merchantPaymentUrl
         storeAppListingSubscriptionKey
       }
     }
@@ -861,6 +920,7 @@ export class GeneratedMutations {
       id
       merchantPaymentUrl
       status
+      storeAppListingSubscriptionKey
     }
   }
 `;
